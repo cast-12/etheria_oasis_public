@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Etheria GW — Stats</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Etheria Guild War — Counter Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
   :root {
     --bg:          #09071A;
     --surface:     #110D27;
@@ -475,29 +475,178 @@
 <body>
 
 <header>
-  <div style="display:flex;align-items:center;gap:16px">
-    <div class="brand">
-      <div class="brand-icon">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><polygon points="9,1 17,17 1,17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
-      </div>
-      <span class="brand-name">Etheria GW</span>
-    </div>
-    <nav class="nav-tabs">
-      <button class="tab-btn active" id="tab-stats"  onclick="showSection('stats')">Player Stats</button>
-      <button class="tab-btn"        id="tab-roster" onclick="showSection('roster')">Roster</button>
-    </nav>
+  <div class="logo">
+    <div class="logo-hex" aria-hidden="true">⚔</div>
+    Etheria GW
   </div>
-  <div style="display:flex;align-items:center;gap:6px">
+
+  <nav class="nav-tabs" aria-label="Main navigation">
+    
+    
+    <button class="tab-btn" id="tab-stats" onclick="showSection('stats')">Player Stats</button>
+    <button class="tab-btn" id="tab-roster" onclick="showSection('roster')">Roster</button>
+    
+  </nav>
+
+  <div class="conn-pill">
     <span class="conn-dot" id="conn-dot"></span>
-    <span id="conn-text" style="font-size:13px;color:var(--text-2)">Connecting…</span>
+    <span id="conn-text">Not configured</span>
   </div>
 </header>
 
 <main>
+
+  <!-- Setup banner -->
+  <div class="setup-banner" id="setup-banner">
+    <h2>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="#A78BFA" stroke-width="1.5"/><path d="M8 5v4M8 11v.5" stroke="#A78BFA" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Firebase setup required
+    </h2>
+    <p>Connect a free Firestore database so all guild members share the same counter data in real time.</p>
+    <ol>
+      <li>Go to <strong>console.firebase.google.com</strong> → Create a project (free).</li>
+      <li>Inside the project click <strong>Firestore Database</strong> → Create database → <strong>Start in test mode</strong>.</li>
+      <li>Go to <strong>Project Settings</strong> (gear icon) → Your apps → click <code>&lt;/&gt;</code> web icon → Register app → copy the config values below.</li>
+    </ol>
+    <div class="setup-fields">
+      <input type="text" id="cfg-apiKey"       placeholder="apiKey"       autocomplete="off">
+      <input type="text" id="cfg-authDomain"   placeholder="authDomain"   autocomplete="off">
+      <input type="text" id="cfg-projectId"    placeholder="projectId"    autocomplete="off">
+      <input type="text" id="cfg-appId"        placeholder="appId"        autocomplete="off">
+    </div>
+    <button class="btn btn-primary" onclick="saveConfig()">Connect to Firebase</button>
+    <p class="setup-note">Config is saved in your browser. For Vercel deployment, hardcode your values in the <code>HARDCODED_CONFIG</code> variable in the script so all visitors connect automatically.</p>
+  </div>
+
+  <!-- LOOKUP -->
+  <div id="section-lookup" class="section">
+    <p class="page-eyebrow">Guild War on Etheria Restart</p>
+    <h1 class="page-heading">Counter Lookup</h1>
+    <p class="page-sub">Enter 1–3 enemy units to find all matching counter teams. Case-insensitive — capitalization doesn't matter.</p>
+
+    <div class="card card-glow">
+      <div class="card-title">Enemy Team</div>
+      <div class="unit-grid">
+        <div>
+          <label class="input-label" for="enemy1">Unit 1</label>
+          <input type="text" id="enemy1" placeholder="e.g. Xuan Li" autocomplete="off">
+        </div>
+        <div>
+          <label class="input-label" for="enemy2">Unit 2 <span style="opacity:0.5;font-weight:400">(optional)</span></label>
+          <input type="text" id="enemy2" placeholder="e.g. Kethos" autocomplete="off">
+        </div>
+        <div>
+          <label class="input-label" for="enemy3">Unit 3 <span style="opacity:0.5;font-weight:400">(optional)</span></label>
+          <input type="text" id="enemy3" placeholder="e.g. Sylph" autocomplete="off">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" id="lookup-btn" onclick="doLookup()">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/><line x1="9.5" y1="9.5" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Find Counter Team
+      </button>
+    </div>
+
+    <div id="result-area"></div>
+  </div>
+
+  <!-- MANAGE DATA -->
+  <div id="section-data" class="section">
+    <p class="page-eyebrow">Shared Database</p>
+    <h1 class="page-heading">Manage Counter Data</h1>
+    <p class="page-sub">All entries are stored in Firestore and visible to every guild member the moment they're saved.</p>
+
+    <div class="two-col">
+
+      <!-- Add form -->
+      <div class="card" style="height:fit-content">
+        <div class="card-title">Add New Entry</div>
+
+        <p class="section-label">Enemy team</p>
+        <div class="field">
+          <label class="input-label" for="a-e1">Unit 1</label>
+          <input type="text" id="a-e1" placeholder="e.g. Xuan Li" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="input-label" for="a-e2">Unit 2</label>
+          <input type="text" id="a-e2" placeholder="e.g. Kethos" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="input-label" for="a-e3">Unit 3</label>
+          <input type="text" id="a-e3" placeholder="e.g. Sylph" autocomplete="off">
+        </div>
+
+        <hr class="divider">
+        <p class="section-label">Counter team</p>
+
+        <div class="field">
+          <label class="input-label" for="a-c1">Unit 1</label>
+          <input type="text" id="a-c1" placeholder="e.g. Xuan Li" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="input-label" for="a-c2">Unit 2</label>
+          <input type="text" id="a-c2" placeholder="e.g. Kethos" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="input-label" for="a-c3">Unit 3</label>
+          <input type="text" id="a-c3" placeholder="e.g. Sylph" autocomplete="off">
+        </div>
+
+        <hr class="divider">
+
+        <div class="field">
+          <label class="input-label" for="a-name">Team name (optional)</label>
+          <input type="text" id="a-name" placeholder="e.g. Burst Comp" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="input-label" for="a-note">Strategy notes (optional)</label>
+          <textarea id="a-note" placeholder="e.g. Focus Striker first, use CC on Warrior…"></textarea>
+        </div>
+
+        <button class="btn btn-primary btn-full" id="add-btn" onclick="addEntry()">Save Entry</button>
+
+        <div class="io-row">
+          <button class="btn btn-ghost" onclick="exportData()" style="flex:1">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1v7M4 5.5l2.5 2.5 2.5-2.5M1 10.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Export JSON
+          </button>
+          <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()" style="flex:1">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 8V1M4 3.5L6.5 1 9 3.5M1 10.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Import JSON
+          </button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+        </div>
+        <div class="io-row" style="margin-top:8px">
+          <button class="btn btn-primary btn-full" onclick="document.getElementById('import-xlsx').click()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 8V1M4 3.5L6.5 1 9 3.5M1 10.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Import from Spreadsheet (.xlsx)
+          </button>
+          <input type="file" id="import-xlsx" accept=".xlsx,.xls" style="display:none" onchange="importXlsx(event)">
+        </div>
+      </div>
+
+      <!-- Entry list -->
+      <div class="card">
+        <div class="card-title">
+          Saved entries
+          <span class="count-chip" id="entry-count">0</span>
+        </div>
+        <div class="search-row">
+          <input type="text" id="search-input" placeholder="Filter by unit name…" oninput="renderList()" style="flex:1">
+        </div>
+        <div class="entry-list" id="entry-list">
+          <div class="empty-state">Connect to Firebase to load data.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
   <!-- PLAYER STATS -->
   <div id="section-stats" class="section active">
     <p class="page-eyebrow">Guild War on Etheria Restart</p>
     <h1 class="page-heading">Player Stats</h1>
+    <!-- Toolbar -->
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem">
       <input type="text" id="stats-search" placeholder="Filter player…" oninput="renderStats()" style="flex:1;min-width:160px;max-width:220px">
       <div class="toggle-group">
@@ -511,8 +660,14 @@
         <button class="toggle-btn"        id="sort-hits" onclick="setStatsSort('hits')">Hits</button>
       </div>
     </div>
+
+    <!-- War filter chips -->
     <div class="war-chips" id="stats-war-chips" style="margin-bottom:1.25rem"></div>
+
+    <!-- Summary -->
     <div class="stats-summary" id="stats-summary"></div>
+
+    <!-- Table -->
     <div class="stats-table-wrap">
       <table class="stats-table">
         <thead id="stats-thead"></thead>
@@ -521,11 +676,13 @@
     </div>
   </div>
 
+
   <!-- ROSTER -->
   <div id="section-roster" class="section">
     <p class="page-eyebrow">Guild War on Etheria Restart</p>
     <h1 class="page-heading">Roster</h1>
-    <p class="page-sub" id="roster-sub">Active players from the most recent war.</p>
+    <p class="page-sub" id="roster-sub">Active players from the most recent war, ranked by overall WR.</p>
+
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem">
       <div class="toggle-group">
         <button class="toggle-btn active" id="roster-mode-both"    onclick="setRosterMode('both')">Both</button>
@@ -533,7 +690,11 @@
         <button class="toggle-btn"        id="roster-mode-defense" onclick="setRosterMode('defense')">Defense</button>
       </div>
     </div>
+
+    <!-- Summary cards -->
     <div class="stats-summary" id="roster-summary"></div>
+
+    <!-- Table -->
     <div class="stats-table-wrap" style="margin-top:1rem">
       <table class="stats-table">
         <thead id="roster-thead"></thead>
@@ -541,64 +702,628 @@
       </table>
     </div>
   </div>
+
+
+  <!-- WAR PLANNER -->
+  <div id="section-planner" class="section" style="max-width:100%;padding-left:0;padding-right:0">
+    <h1 class="page-heading">GvG Planner</h1>
+
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+      <button class="btn btn-ghost" onclick="resetPlannerToDefault()">Reset to Default</button>
+      <button class="btn btn-ghost" onclick="exportPlannerImage()">Export Image</button>
+      <button class="btn btn-primary" onclick="saveCurrentAsDefault()">Set as Default</button>
+      <span style="font-size:13px;color:var(--text-3)">Click any name to edit. Changes save live for all guild members.</span>
+    </div>
+
+    <!-- Map canvas -->
+    <div style="position:relative;width:80vw;max-width:1100px;border-radius:12px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1920/1071" id="planner-map">
+      <div style="position:absolute;inset:0;overflow:hidden;border-radius:12px;z-index:0">
+  <img src="https://www.sfetheria.com/images/gvg/standard-garrison-default.webp" crossorigin="anonymous" id="planner-img" style="width:100%;display:block;pointer-events:none;filter:brightness(0.75)" draggable="false">
+  <div style="position:absolute;inset:0;background:rgba(4,3,18,0.15)"></div>
+</div>
+      <div id="planner-boxes" style="position:absolute;inset:0;pointer-events:none"></div>
+    </div>
+  </div>
+
 </main>
 
-<div class="toast" id="toast"></div>
+<!-- Edit modal -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Entry</span>
+      <button class="modal-close" onclick="closeEditModal()" aria-label="Close">&times;</button>
+    </div>
 
+    <input type="hidden" id="edit-id">
 
+    <p class="section-label" style="margin-bottom:10px">Enemy team</p>
+    <div class="modal-grid">
+      <div>
+        <label class="input-label" for="edit-e1">Unit 1</label>
+        <input type="text" id="edit-e1" autocomplete="off">
+      </div>
+      <div>
+        <label class="input-label" for="edit-e2">Unit 2</label>
+        <input type="text" id="edit-e2" autocomplete="off">
+      </div>
+      <div>
+        <label class="input-label" for="edit-e3">Unit 3</label>
+        <input type="text" id="edit-e3" autocomplete="off">
+      </div>
+    </div>
 
-<script>
-window.showSection = name => {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('section-' + name).classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'stats' && window.renderStats) renderStats();
-  if (name === 'roster' && window.renderRoster) renderRoster();
-};
-window.toast = (msg, type='') => {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.className = 'toast show ' + type;
-  setTimeout(() => el.className = 'toast', 2800);
-};
-// Stub out functions referenced in scripts but not needed here
-window.renderList = () => {};
-window.openAddWarModal = () => {};
-window.closeAddWarModal = () => {};
-</script>
+    <p class="section-label" style="margin-bottom:10px;margin-top:4px">Counter team</p>
+    <div class="modal-grid">
+      <div>
+        <label class="input-label" for="edit-c1">Unit 1</label>
+        <input type="text" id="edit-c1" autocomplete="off">
+      </div>
+      <div>
+        <label class="input-label" for="edit-c2">Unit 2</label>
+        <input type="text" id="edit-c2" autocomplete="off">
+      </div>
+      <div>
+        <label class="input-label" for="edit-c3">Unit 3</label>
+        <input type="text" id="edit-c3" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:12px">
+      <label class="input-label" for="edit-name">Team name (optional)</label>
+      <input type="text" id="edit-name" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="input-label" for="edit-note">Strategy notes (optional)</label>
+      <textarea id="edit-note" style="min-height:64px"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="flex:1" onclick="saveEdit()">Save Changes</button>
+      <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc,
          query, where, onSnapshot, writeBatch, setDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-const cfg = {
+// ═══════════════════════════════════════════════════════════
+// HARDCODE YOUR FIREBASE CONFIG HERE FOR VERCEL DEPLOYMENT:
+// ═══════════════════════════════════════════════════════════
+const HARDCODED_CONFIG = {
   apiKey:      "AIzaSyDDSkAtsiANMnboxfoQsXd39bd9KJu6ABw",
   authDomain:  "etheria-leads.firebaseapp.com",
   projectId:   "etheria-leads",
   appId:       "1:792684605120:web:3deb9f0fa8e131b31c8725"
 };
 
-const app  = initializeApp(cfg);
-const db   = getFirestore(app);
-const fns  = { collection, addDoc, getDocs, deleteDoc, doc, query, where, onSnapshot, writeBatch, setDoc };
-window.fsDb    = db;
-window.__fsFns = fns;
+const CFG_KEY = 'etheria_fb_v2';
+let fsDb = null;
+let entries = [];
+let unsub = null;
 
-document.getElementById('conn-dot').className  = 'conn-dot on';
-document.getElementById('conn-text').textContent = 'Connected';
+// ── Utilities ───────────────────────────────────────────
+const esc  = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+window.esc = esc;
+const norm = s => (s||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+const key  = (a,b,c) => [norm(a),norm(b),norm(c)].sort().join('|');
 
-// Wait for initStatsListener to be defined by the non-module script
-let n = 0;
-const t = setInterval(() => {
-  if (window.initStatsListener) { window.initStatsListener(db, fns); clearInterval(t); }
-  if (++n > 50) clearInterval(t);
-}, 100);
+// Nickname / alias map -- alias (normed) -> canonical normed name
+const ALIASES = {
+  'xc':'xuanchi',   'xuanchi':'xuanchi',
+  'xl':'xuanli',    'xuanli':'xuanli',
+  'ray':'raymerry', 'raymerry':'raymerry',
+  'fia':'fiamelia', 'fiamelia':'fiamelia',
+  'tia':'tiamat',   'tiamat':'tiamat',
+};
+function resolve(s) { const n = norm(s); return ALIASES[n] || n; }
+function allAliases(s) { const c = resolve(s); return Object.keys(ALIASES).filter(k => ALIASES[k]===c); }
+
+window.toast = (msg, type='') => {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  setTimeout(() => el.className = 'toast', 2800);
+};
+
+function setConn(state, text) {
+  document.getElementById('conn-dot').className = 'conn-dot ' + state;
+  document.getElementById('conn-text').textContent = text;
+}
+
+// ── Init ────────────────────────────────────────────────
+async function initFB(cfg) {
+  try {
+    const app = initializeApp(cfg);
+    fsDb = getFirestore(app);
+    setConn('on', 'Connected');
+    document.getElementById('setup-banner').style.display = 'none';
+
+    // Expose Firestore fns for non-module stats script
+    window.__fsFns = { collection, addDoc, doc, setDoc, deleteDoc, onSnapshot, getDocs, query, where, writeBatch };
+    window.fsDb = fsDb;
+
+    if (unsub) unsub();
+    unsub = onSnapshot(collection(fsDb,'counters'), snap => {
+      entries = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      document.getElementById('entry-count').textContent = entries.length;
+      renderList();
+    }, err => { setConn('err','Firestore error'); console.error(err); });
+
+    // Start stats listener
+    if (window.initStatsListener) window.initStatsListener();
+  } catch(e) {
+    setConn('err','Config error');
+    window.toast('Firebase init failed: ' + e.message, 'err');
+  }
+}
+
+// ── Save config from setup form ─────────────────────────
+window.saveConfig = async () => {
+  const cfg = {
+    apiKey:     document.getElementById('cfg-apiKey').value.trim(),
+    authDomain: document.getElementById('cfg-authDomain').value.trim(),
+    projectId:  document.getElementById('cfg-projectId').value.trim(),
+    appId:      document.getElementById('cfg-appId').value.trim(),
+  };
+  if (!cfg.apiKey || !cfg.projectId) { window.toast('Fill in at least apiKey and projectId.','err'); return; }
+  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+  await initFB(cfg);
+};
+
+// ── Section nav ─────────────────────────────────────────
+window.showSection = name => {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'data') renderList();
+  if (name === 'stats' && window.renderStats) renderStats();
+  if (name === 'roster' && window.renderRoster) renderRoster();
+  if (name === 'planner' && window.initPlanner) initPlanner();
+};
+
+// ── Lookup ──────────────────────────────────────────────
+window.doLookup = () => {
+  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
+
+  const e1 = document.getElementById('enemy1').value.trim();
+  const e2 = document.getElementById('enemy2').value.trim();
+  const e3 = document.getElementById('enemy3').value.trim();
+
+  // Collect only the units that were actually entered
+  const searched = [e1, e2, e3].filter(Boolean);
+  if (!searched.length) { window.toast('Enter at least one unit to search.','err'); return; }
+
+  // Normalise each searched unit and match against stored enemy units
+  // An entry matches if ALL searched units appear among its 3 enemy slots
+  const normed = searched.map(resolve);
+  const hits = entries.filter(entry => {
+    const entryUnits = [resolve(entry.e1), resolve(entry.e2), resolve(entry.e3)];
+    return normed.every(u => entryUnits.includes(u));
+  });
+
+  const ra = document.getElementById('result-area');
+  const searchLabel = searched.join(' · ');
+
+  if (!hits.length) {
+    ra.innerHTML = `
+      <div class="result-empty">
+        <strong>No counter found</strong>
+        <p>No data yet for <em>${esc(searchLabel)}</em>.</p>
+        <button class="suggest-btn" onclick="prefillAdd('${esc(e1)}','${esc(e2)}','${esc(e3)}')">
+          + Add a counter for this team
+        </button>
+      </div>`;
+  } else {
+    ra.innerHTML = `<div class="result-multi">${hits.map((m,i) => `
+      <div class="result-found">
+        <div class="result-badge">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M3 5l1.5 1.5L7 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Counter ${i+1} of ${hits.length}
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">vs ${esc(m.e1)} · ${esc(m.e2)} · ${esc(m.e3)}</div>
+        ${m.name?`<div class="result-team-name">${esc(m.name)}</div>`:''}
+        <div class="result-units">
+          <span class="unit-pill">${esc(m.c1)}</span>
+          <span class="unit-pill">${esc(m.c2)}</span>
+          <span class="unit-pill">${esc(m.c3)}</span>
+        </div>
+        ${m.note?`<div class="result-note">${esc(m.note)}</div>`:''}
+      </div>`).join('')}</div>`;
+  }
+};
+
+window.prefillAdd = (e1,e2,e3) => {
+  showSection('stats');
+  setTimeout(() => {
+    document.getElementById('a-e1').value = e1;
+    document.getElementById('a-e2').value = e2;
+    document.getElementById('a-e3').value = e3;
+    document.getElementById('a-c1').focus();
+  }, 60);
+};
+
+// ── Add entry ───────────────────────────────────────────
+window.addEntry = async () => {
+  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
+  const [e1,e2,e3,c1,c2,c3] = ['a-e1','a-e2','a-e3','a-c1','a-c2','a-c3'].map(id => document.getElementById(id).value.trim());
+  if (!e1||!e2||!e3) { window.toast('Fill in all 3 enemy units.','err'); return; }
+  if (!c1||!c2||!c3) { window.toast('Fill in all 3 counter units.','err'); return; }
+  const name = document.getElementById('a-name').value.trim();
+  const note = document.getElementById('a-note').value.trim();
+  const btn  = document.getElementById('add-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await addDoc(collection(fsDb,'counters'), { key:key(e1,e2,e3), e1,e2,e3,c1,c2,c3,name,note,added:Date.now() });
+    ['a-e1','a-e2','a-e3','a-c1','a-c2','a-c3','a-name','a-note'].forEach(id => document.getElementById(id).value='');
+    window.toast('Entry saved!','ok');
+  } catch(e) {
+    window.toast('Save failed: '+e.message,'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Entry';
+  }
+};
+
+window.deleteEntry = async id => {
+  if (!fsDb) return;
+  try { await deleteDoc(doc(fsDb,'counters',id)); window.toast('Removed.'); }
+  catch(e) { window.toast('Delete failed: '+e.message,'err'); }
+};
+
+window.clearAll = async () => {
+  if (!fsDb) return;
+  if (!confirm('Delete ALL '+entries.length+' entries for everyone? Cannot be undone.')) return;
+  try {
+    const snap = await getDocs(collection(fsDb,'counters'));
+    const batch = writeBatch(fsDb);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    window.toast('All data cleared.');
+  } catch(e) { window.toast('Clear failed: '+e.message,'err'); }
+};
+
+// ── Render list ─────────────────────────────────────────
+window.renderList = () => {
+  const list = document.getElementById('entry-list');
+  const q = (document.getElementById('search-input').value||'').trim().toLowerCase();
+  let filtered = q
+    ? entries.filter(e => { const qa = allAliases(q); return [e.e1,e.e2,e.e3,e.c1,e.c2,e.c3,e.name,e.note].some(v => { if (!v) return false; const vn = norm(v); const vr = resolve(v); return v.toLowerCase().includes(q) || qa.includes(vn) || qa.includes(vr); }); })
+    : entries;
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty-state">${q?`No entries match "${esc(q)}".`:(fsDb?'No entries yet. Add your first matchup!':'Connect to Firebase to load data.')}</div>`;
+    return;
+  }
+  list.innerHTML = [...filtered].reverse().map(e => `
+    <div class="entry-row">
+      <div class="entry-body">
+        <div class="entry-enemy">${esc(e.e1)} · ${esc(e.e2)} · ${esc(e.e3)}</div>
+        <div class="entry-counter">&#9658; ${esc(e.c1)} · ${esc(e.c2)} · ${esc(e.c3)}</div>
+      </div>
+      <div class="entry-actions">
+        <button class="entry-edit" onclick="openEditModal('${esc(e.id)}')" title="Edit entry" aria-label="Edit entry">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M9 2l2 2-7 7H2V9l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="entry-del" onclick="deleteEntry('${esc(e.id)}')" title="Remove entry" aria-label="Remove entry">✕</button>
+      </div>
+    </div>`).join('');
+};
+
+// ── Export / Import ─────────────────────────────────────
+window.exportData = () => {
+  if (!entries.length) { window.toast('No data to export.','err'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(entries,null,2)],{type:'application/json'}));
+  a.download = 'etheria_gw_counters.json'; a.click();
+  window.toast('Exported!','ok');
+};
+
+window.importData = async event => {
+  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const arr = JSON.parse(e.target.result);
+      if (!Array.isArray(arr)) throw new Error('Bad format');
+      let added = 0;
+      for (const entry of arr) {
+        if (entry.e1 && entry.c1) {
+          await addDoc(collection(fsDb,'counters'), {
+            key:key(entry.e1,entry.e2||'',entry.e3||''),
+            e1:entry.e1||'',e2:entry.e2||'',e3:entry.e3||'',
+            c1:entry.c1||'',c2:entry.c2||'',c3:entry.c3||'',
+            name:entry.name||'',note:entry.note||'',added:entry.added||Date.now()
+          });
+          added++;
+        }
+      }
+      window.toast('Imported '+added+' entries.','ok');
+    } catch(err) { window.toast('Import failed: '+err.message,'err'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+};
+
+
+// ── Edit modal ──────────────────────────────────────────
+window.openEditModal = id => {
+  const entry = entries.find(e => e.id === id);
+  if (!entry) return;
+  document.getElementById('edit-id').value   = id;
+  document.getElementById('edit-e1').value   = entry.e1 || '';
+  document.getElementById('edit-e2').value   = entry.e2 || '';
+  document.getElementById('edit-e3').value   = entry.e3 || '';
+  document.getElementById('edit-c1').value   = entry.c1 || '';
+  document.getElementById('edit-c2').value   = entry.c2 || '';
+  document.getElementById('edit-c3').value   = entry.c3 || '';
+  document.getElementById('edit-name').value = entry.name || '';
+  document.getElementById('edit-note').value = entry.note || '';
+  document.getElementById('edit-modal').classList.add('open');
+};
+
+window.closeEditModal = () => {
+  document.getElementById('edit-modal').classList.remove('open');
+};
+
+// Close on backdrop click
+document.getElementById('edit-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeEditModal();
+});
+
+window.saveEdit = async () => {
+  if (!fsDb) return;
+  const id = document.getElementById('edit-id').value;
+  const e1 = document.getElementById('edit-e1').value.trim();
+  const e2 = document.getElementById('edit-e2').value.trim();
+  const e3 = document.getElementById('edit-e3').value.trim();
+  const c1 = document.getElementById('edit-c1').value.trim();
+  const c2 = document.getElementById('edit-c2').value.trim();
+  const c3 = document.getElementById('edit-c3').value.trim();
+  const name = document.getElementById('edit-name').value.trim();
+  const note = document.getElementById('edit-note').value.trim();
+
+  if (!e1) { window.toast('Enemy Unit 1 is required.','err'); return; }
+  if (!c1) { window.toast('Counter Unit 1 is required.','err'); return; }
+
+  const btn = document.querySelector('#edit-modal .btn-primary');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await setDoc(doc(fsDb,'counters',id), {
+      key: key(e1,e2,e3), e1,e2,e3,c1,c2,c3,name,note, added: Date.now()
+    });
+    closeEditModal();
+    window.toast('Entry updated!','ok');
+  } catch(err) {
+    window.toast('Update failed: '+err.message,'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Changes';
+  }
+};
+
+// ── Import from XLSX (Mapping sheet) ────────────────────
+window.importXlsx = async event => {
+  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
+  const file = event.target.files[0]; if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+
+      // Find the Mapping sheet (case-insensitive)
+      const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'mapping');
+      if (!sheetName) throw new Error('No "Mapping" sheet found in this file.');
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      let added = 0, skipped = 0;
+      for (const row of rows) {
+        // Column headers: Unit #1, Unit #2, Unit #3, Beat by
+        const e1 = (row['Unit #1'] || '').toString().trim();
+        const e2 = (row['Unit #2'] || '').toString().trim();
+        const e3 = (row['Unit #3'] || '').toString().trim();
+        const beatBy = (row['Beat by'] || '').toString().trim();
+
+        if (!e1 || !beatBy) { skipped++; continue; }
+
+        // Split "Beat by" by comma into up to 3 counter units
+        const parts = beatBy.split(',').map(s => s.trim()).filter(Boolean);
+        const c1 = parts[0] || '';
+        const c2 = parts[1] || '';
+        const c3 = parts[2] || '';
+
+        if (!c1) { skipped++; continue; }
+
+        await addDoc(collection(fsDb, 'counters'), {
+          key: key(e1, e2, e3),
+          e1, e2, e3, c1, c2, c3,
+          name: '', note: '',
+          added: Date.now()
+        });
+        added++;
+      }
+
+      window.toast(`Imported ${added} entries${skipped ? `, skipped ${skipped}` : ''}.`, 'ok');
+    } catch(err) {
+      window.toast('XLSX import failed: ' + err.message, 'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = '';
+};
+
+// ── Auto-init ────────────────────────────────────────────
+if (HARDCODED_CONFIG) {
+  initFB(HARDCODED_CONFIG);
+} else {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CFG_KEY));
+    if (saved) initFB(saved);
+  } catch {}
+}
+
 </script>
 
-<script>
 
+
+
+<!-- Edit War modal -->
+<div class="modal-backdrop" id="edit-war-modal">
+  <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+    <div class="modal-header">
+      <span class="modal-title" id="ew-modal-title">Edit War</span>
+      <button class="modal-close" onclick="closeEditWarModal()">&times;</button>
+    </div>
+
+    <input type="hidden" id="ew-original-name">
+
+    <div class="field" style="margin-bottom:1rem">
+      <label class="input-label" for="ew-war-name">War Name</label>
+      <input type="text" id="ew-war-name" autocomplete="off">
+    </div>
+
+    <hr class="divider">
+    <p class="section-label" style="margin-bottom:10px">Players in this war</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <div>
+        <p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px">⚔ Offense — Name · W · L</p>
+        <div style="display:grid;grid-template-columns:1fr 48px 48px;gap:3px;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--text-3);padding-left:4px">Name</span>
+          <span style="font-size:10px;color:var(--text-3);text-align:center">W</span>
+          <span style="font-size:10px;color:var(--text-3);text-align:center">L</span>
+        </div>
+        <div id="ew-atk-rows" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+      <div>
+        <p style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px">🛡 Defense — Name · W · L</p>
+        <div style="display:grid;grid-template-columns:1fr 48px 48px;gap:3px;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--text-3);padding-left:4px">Name</span>
+          <span style="font-size:10px;color:var(--text-3);text-align:center">W</span>
+          <span style="font-size:10px;color:var(--text-3);text-align:center">L</span>
+        </div>
+        <div id="ew-def-rows" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:1.25rem">
+      <button class="btn btn-primary" style="flex:1" id="ew-save-btn" onclick="saveEditWar()">Save Changes</button>
+      <button class="btn btn-danger" onclick="deleteWar()" id="ew-delete-btn">Delete War</button>
+      <button class="btn btn-ghost" onclick="closeEditWarModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add War modal -->
+<div class="modal-backdrop" id="add-war-modal">
+  <div class="modal" style="max-width:780px;max-height:90vh;overflow-y:auto">
+    <div class="modal-header">
+      <span class="modal-title">Add New War</span>
+      <span style="font-size:11px;color:var(--text-3);margin-right:8px">✓ Auto-saves as you type</span><button class="modal-close" onclick="closeAddWarModal()">&times;</button>
+    </div>
+
+    <div class="field">
+      <label class="input-label" for="aw-war-name">War Name</label>
+      <input type="text" id="aw-war-name" placeholder="e.g. S4 War 2 Vs GuildName" autocomplete="off">
+    </div>
+
+    <hr class="divider">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+
+      <!-- Offense -->
+      <div>
+        <p class="section-label" style="margin-bottom:10px">⚔ Offense — Player · W · L</p>
+        <div style="display:grid;grid-template-columns:1fr 52px 52px;gap:4px;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;padding-left:4px">Name</span>
+          <span style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;text-align:center">W</span>
+          <span style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;text-align:center">L</span>
+        </div>
+        <div id="aw-atk-rows" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+
+      <!-- Defense -->
+      <div>
+        <p class="section-label" style="margin-bottom:10px">🛡 Defense — Player · W · L</p>
+        <div style="display:grid;grid-template-columns:1fr 52px 52px;gap:4px;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;padding-left:4px">Name</span>
+          <span style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;text-align:center">W</span>
+          <span style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;text-align:center">L</span>
+        </div>
+        <div id="aw-def-rows" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+
+    </div>
+
+    <div class="modal-actions" style="margin-top:1.25rem">
+      <button class="btn btn-primary" style="flex:1" id="aw-save-btn" onclick="saveAddWar()">Save War</button>
+      <button class="btn btn-ghost" onclick="closeAddWarModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Player Stats modal -->
+<div class="modal-backdrop" id="stat-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <span class="modal-title" id="stat-modal-title">Add Player Stats</span>
+      <button class="modal-close" onclick="closeStatModal()">&times;</button>
+    </div>
+    <input type="hidden" id="sm-id">
+
+    <div class="field">
+      <label class="input-label" for="sm-player">Player Name</label>
+      <input type="text" id="sm-player" placeholder="e.g. Bando" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="input-label" for="sm-war">War / Context (optional)</label>
+      <input type="text" id="sm-war" placeholder="e.g. S4 War 1, or leave blank for overall" autocomplete="off">
+    </div>
+
+    <hr class="divider">
+    <p class="section-label" style="margin-bottom:10px">Offense</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:0">
+        <label class="input-label" for="sm-aw">Wins</label>
+        <input type="number" id="sm-aw" min="0" placeholder="0" autocomplete="off">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label class="input-label" for="sm-al">Losses</label>
+        <input type="number" id="sm-al" min="0" placeholder="0" autocomplete="off">
+      </div>
+    </div>
+
+    <hr class="divider">
+    <p class="section-label" style="margin-bottom:10px">Defense</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
+      <div class="field" style="margin-bottom:0">
+        <label class="input-label" for="sm-dw">Wins</label>
+        <input type="number" id="sm-dw" min="0" placeholder="0" autocomplete="off">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label class="input-label" for="sm-dl">Losses</label>
+        <input type="number" id="sm-dl" min="0" placeholder="0" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="flex:1" id="sm-save-btn" onclick="saveStat()">Save</button>
+      <button class="btn btn-ghost" onclick="closeStatModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
 // ══════════════════════════════════════════════════════
 // PLAYER STATS — Firestore database
 // Collection: 'playerstats'
@@ -614,21 +1339,19 @@ let activeStatsWars = new Set(['__all__']);
 let warsMeta        = {};  // { warName: { archived: bool } }
 
 // ── Subscribe to playerstats collection ─────────────
-window.initStatsListener = function(db, fns) {
-  if (db) window.fsDb = db;
-  if (fns) window.__fsFns = fns;
-  if (!window.fsDb || !window.__fsFns || statsUnsub) return;
+window.initStatsListener = function() {
+  if (!window.fsDb || statsUnsub) return;
   const { collection, onSnapshot } = window.__fsFns;
   // Listen to war metadata (archived flags)
   onSnapshot(collection(window.fsDb,'wars'), snap => {
     warsMeta = {};
     snap.docs.forEach(d => { warsMeta[d.id] = d.data(); });
-    if (window.rebuildWarChips) rebuildWarChips();
+    rebuildWarChips();
   });
   statsUnsub = onSnapshot(collection(window.fsDb,'playerstats'), snap => {
     statsEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    if (window.rebuildWarChips) rebuildWarChips();
-    if (window.renderStats) renderStats();
+    rebuildWarChips();
+    renderStats();
     if (window.renderRoster) renderRoster();
   });
 };
@@ -643,9 +1366,12 @@ window.openStatModal = (entry) => {
   document.getElementById('sm-dw').value      = entry ? (entry.dWins||0) : '';
   document.getElementById('sm-dl').value      = entry ? (entry.dLoss||0) : '';
   document.getElementById('stat-modal-title').textContent = entry ? 'Edit Player Stats' : 'Add Player Stats';
-    setTimeout(() => document.getElementById('sm-player').focus(), 60);
+  document.getElementById('stat-modal').classList.add('open');
+  setTimeout(() => document.getElementById('sm-player').focus(), 60);
 };
-window.closeStatModal = () => 
+window.closeStatModal = () => document.getElementById('stat-modal').classList.remove('open');
+document.getElementById('stat-modal').addEventListener('click', e => { if (e.target===e.currentTarget) closeStatModal(); });
+
 window.saveStat = async () => {
   if (!window.fsDb) { window.toast('Not connected to Firebase.','err'); return; }
   const player = document.getElementById('sm-player').value.trim();
@@ -814,9 +1540,12 @@ window.openEditWarModal = async name => {
   document.getElementById('ew-atk-rows').innerHTML = atkHtml;
   document.getElementById('ew-def-rows').innerHTML = defHtml;
 
-  };
+  document.getElementById('edit-war-modal').classList.add('open');
+};
 
-window.closeEditWarModal = () =>   if (e.target === e.currentTarget) closeEditWarModal();
+window.closeEditWarModal = () => document.getElementById('edit-war-modal').classList.remove('open');
+document.getElementById('edit-war-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeEditWarModal();
 });
 
 window.saveEditWar = async () => {
@@ -1243,16 +1972,20 @@ window.openAddWarModal = () => {
   }
 
   // Auto-save on any input change
-  const modal =   modal.querySelectorAll('input').forEach(inp => {
+  const modal = document.getElementById('add-war-modal');
+  modal.querySelectorAll('input').forEach(inp => {
     inp.addEventListener('input', saveWarDraft);
   });
   // Also watch dynamically added rows
   modal.addEventListener('input', saveWarDraft);
 
-    setTimeout(() => document.getElementById('aw-war-name').focus(), 60);
+  document.getElementById('add-war-modal').classList.add('open');
+  setTimeout(() => document.getElementById('aw-war-name').focus(), 60);
 };
 
-window.closeAddWarModal = () =>   if (e.target === e.currentTarget) closeAddWarModal();
+window.closeAddWarModal = () => document.getElementById('add-war-modal').classList.remove('open');
+document.getElementById('add-war-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAddWarModal();
 });
 
 window.saveAddWar = async () => {
@@ -1306,7 +2039,8 @@ window.saveAddWar = async () => {
   }
 };
 
-
+// ── Expose Firestore fns for stats (set after module init) ──
+window.__fsFns = {};
 
 // ══════════════════════════════════════════════════════
 // ROSTER TAB — active players from most recent war
@@ -1440,8 +2174,354 @@ window.initStatsListener = function(db, fns) {
   _origInitStats && _origInitStats(db, fns);
 };
 
-
 </script>
 
-</body>
-</html>
+<script>
+// ══════════════════════════════════════════════════════
+// GvG PLANNER — card-style nodes, multi-player slots
+// Firestore collections:
+//   plannerNodes  — node labels (id, label)
+//   plannerSlots  — player names (nodeId, slotIdx, name)
+//   plannerDefaults — saved default state
+// ══════════════════════════════════════════════════════
+
+const PLANNER_NODES = [
+  { id:  0, label: "Prime Nexus",    x: 14.5, y:  8.6, color: "#ef4444", slots: 3 },
+  { id:  1, label: "Medical Hub",    x: 16.5, y: 28.5, color: "#a855f7", slots: 2 },
+  { id:  2, label: "Molecular Lab",  x: 32.2, y:  9.0, color: "#a855f7", slots: 2 },
+  { id:  3, label: "Stealth Hub",    x: 61.3, y: 10.5, color: "#a855f7", slots: 2 },
+  { id:  4, label: "Supply Hub",     x: 80.2, y: 42.0, color: "#a855f7", slots: 2 },
+  { id:  5, label: "Recon Spire",    x: 50.3, y: 81.0, color: "#a855f7", slots: 2 },
+  { id:  6, label: "Reserve Armory", x: 18.5, y: 63.8, color: "#a855f7", slots: 2 },
+  { id:  7, label: "Train Station",  x: 52.1, y: 57.5, color: "#a855f7", slots: 2 },
+  { id:  8, label: "Anomaly A",      x: 46.8, y:  6.4, color: "#f59e0b", slots: 1 },
+  { id:  9, label: "Anomaly B",      x:  8.5, y: 47.8, color: "#f59e0b", slots: 1 },
+  { id: 10, label: "OB Point A",     x: 88.0, y: 55.3, color: "#06b6d4", slots: 1 },
+  { id: 11, label: "OB Point B",     x: 89.5, y: 72.0, color: "#06b6d4", slots: 1 },
+  { id: 12, label: "OB Point C",     x: 82.7, y: 84.4, color: "#06b6d4", slots: 1 },
+  { id: 13, label: "OB Point D",     x: 65.8, y: 66.0, color: "#06b6d4", slots: 1 },
+  { id: 14, label: "OB Point E",     x: 72.4, y: 25.1, color: "#06b6d4", slots: 1 },
+  { id: 15, label: "OB Point F",     x: 61.5, y: 39.3, color: "#06b6d4", slots: 1 },
+  { id: 16, label: "OB Point G",     x: 39.7, y: 67.3, color: "#06b6d4", slots: 1 },
+  { id: 17, label: "OB Point H",     x: 26.5, y: 75.9, color: "#06b6d4", slots: 1 },
+  { id: 18, label: "OB Point I",     x: 41.8, y: 28.7, color: "#06b6d4", slots: 1 },
+  { id: 19, label: "OB Point J",     x: 30.2, y: 37.6, color: "#06b6d4", slots: 1 },
+  { id: 20, label: "OB Point K",     x: 21.5, y: 51.2, color: "#06b6d4", slots: 1 },
+];
+
+// Live state from Firestore
+// plannerState[nodeId] = { label, players: ['name0','name1',...] }
+let plannerState  = {};
+let plannerInited = false;
+let plannerUnsub1 = null;
+let plannerUnsub2 = null;
+
+// ── Init ──────────────────────────────────────────────
+window.initPlanner = async () => {
+  if (plannerInited) { renderPlanner(); return; }
+  if (!window.fsDb || !window.__fsFns) { setTimeout(initPlanner, 200); return; }
+  plannerInited = true;
+
+  await loadPlannerDefaults();
+
+  const { collection, onSnapshot } = window.__fsFns;
+
+  // Listen to node labels
+  plannerUnsub1 = onSnapshot(collection(window.fsDb, 'plannerNodes'), snap => {
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (!plannerState[data.id]) plannerState[data.id] = { label: null, players: {} };
+      plannerState[data.id].label = data.label;
+    });
+    renderPlanner();
+  });
+
+  // Listen to player slot assignments
+  plannerUnsub2 = onSnapshot(collection(window.fsDb, 'plannerSlots'), snap => {
+    // Reset players
+    PLANNER_NODES.forEach(n => {
+      if (!plannerState[n.id]) plannerState[n.id] = { label: null, players: {} };
+      plannerState[n.id].players = {};
+    });
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (!plannerState[data.nodeId]) plannerState[data.nodeId] = { label: null, players: {} };
+      plannerState[data.nodeId].players[data.slotIdx] = { name: data.name, docId: d.id };
+    });
+    renderPlanner();
+  });
+};
+
+// ── Render ────────────────────────────────────────────
+function renderPlanner() {
+  const container = document.getElementById('planner-boxes');
+  if (!container) return;
+  container.innerHTML = '';
+  container.style.pointerEvents = 'auto';
+
+  PLANNER_NODES.forEach(node => {
+    const state   = plannerState[node.id] || {};
+    const label   = state.label !== null && state.label !== undefined ? state.label : node.label;
+    const players = state.players || {};
+
+    // ── Card ──
+    const card = document.createElement('div');
+    card.style.cssText = `
+      position:absolute;
+      left:${node.x}%; top:${node.y}%;
+      transform:translate(-50%,-50%);
+      font-family:'Inter',sans-serif;
+      z-index:10;
+      min-width:90px;
+      max-width:120px;
+      background:rgba(6,4,20,0.97);
+      border-radius:6px;
+      border-top:2px solid ${node.color};
+      box-shadow:0 2px 10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04);
+      overflow:hidden;
+    `;
+
+    // ── Coloured header bar ──
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background:linear-gradient(90deg, ${node.color}33 0%, transparent 100%);
+      padding:4px 6px 3px;
+      display:flex;align-items:center;gap:5px;
+      border-bottom:1px solid rgba(255,255,255,0.06);
+    `;
+
+    const colorBar = document.createElement('span');
+    colorBar.style.cssText = `width:2px;height:11px;border-radius:2px;background:${node.color};flex-shrink:0`;
+    header.appendChild(colorBar);
+
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = label;
+    titleSpan.style.cssText = `color:#fff;font-size:12px;font-weight:700;white-space:nowrap;letter-spacing:0.2px;text-shadow:0 1px 4px rgba(0,0,0,0.6)`;
+    header.appendChild(titleSpan);
+
+    card.appendChild(header);
+
+    // ── Slot body ──
+    const body = document.createElement('div');
+    body.style.cssText = 'padding:3px 5px 4px;display:flex;flex-direction:column;gap:2px;';
+    card.appendChild(body);
+
+    const slotContainer = body;
+
+    // ── Player slots ──
+    for (let i = 0; i < node.slots; i++) {
+      const slotData = players[i] || {};
+      const playerName = slotData.name || '';
+
+      const slotRow = document.createElement('div');
+      slotRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:2px';
+
+      const slotInput = document.createElement('input');
+      slotInput.value = playerName;
+      slotInput.placeholder = '-';
+      slotInput.style.cssText = `
+        background:rgba(255,255,255,0.08);
+        border:none;
+        border-bottom:1px solid rgba(255,255,255,${playerName ? '0.2' : '0.07'});
+        border-radius:3px;
+        color:rgba(255,255,255,${playerName ? '0.9' : '0.35'});
+        font-size:12px;
+        font-family:Inter,sans-serif;
+        padding:2px 4px;
+        height:20px;
+        text-align:center;
+        width:100%;
+        box-sizing:border-box;
+        outline:none;
+        cursor:text;
+        transition:border-color 0.15s, background 0.15s;
+      `;
+      slotInput.addEventListener('mousedown', e => e.stopPropagation());
+      slotInput.addEventListener('focus', () => { slotInput.style.background = 'rgba(255,255,255,0.15)'; slotInput.style.borderBottomColor = node.color; slotInput.style.color = 'rgba(255,255,255,0.95)'; });
+      slotInput.addEventListener('blur',  () => { slotInput.style.background = 'rgba(255,255,255,0.1)'; slotInput.style.borderBottomColor = slotInput.value ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'; slotInput.style.color = slotInput.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)'; savePlannerPlayer(node.id, i, slotInput.value.trim(), slotData.docId); });
+      slotInput.addEventListener('keydown', e => { if (e.key === 'Enter') slotInput.blur(); });
+      slotRow.appendChild(slotInput);
+      slotContainer.appendChild(slotRow);
+    }
+
+    container.appendChild(card);
+  });
+}
+
+// ── Firestore saves ───────────────────────────────────
+async function savePlannerLabel(nodeId, label) {
+  if (!window.fsDb) return;
+  const { collection, getDocs, query, where, setDoc, addDoc, doc } = window.__fsFns;
+  try {
+    const snap = await getDocs(query(collection(window.fsDb,'plannerNodes'), where('id','==',nodeId)));
+    if (!snap.empty) {
+      await setDoc(snap.docs[0].ref, { id: nodeId, label });
+    } else {
+      await addDoc(collection(window.fsDb,'plannerNodes'), { id: nodeId, label });
+    }
+  } catch(e) { console.error('savePlannerLabel:', e); }
+}
+
+async function savePlannerPlayer(nodeId, slotIdx, name, docId) {
+  if (!window.fsDb) return;
+  const { collection, getDocs, query, where, setDoc, addDoc, doc, deleteDoc } = window.__fsFns;
+  try {
+    if (!name && docId) {
+      // Delete if cleared
+      await deleteDoc(doc(window.fsDb,'plannerSlots',docId));
+      return;
+    }
+    if (!name) return;
+    if (docId) {
+      await setDoc(doc(window.fsDb,'plannerSlots',docId), { nodeId, slotIdx, name });
+    } else {
+      const snap = await getDocs(query(collection(window.fsDb,'plannerSlots'), where('nodeId','==',nodeId), where('slotIdx','==',slotIdx)));
+      if (!snap.empty) {
+        await setDoc(snap.docs[0].ref, { nodeId, slotIdx, name });
+      } else {
+        await addDoc(collection(window.fsDb,'plannerSlots'), { nodeId, slotIdx, name });
+      }
+    }
+  } catch(e) { console.error('savePlannerPlayer:', e); }
+}
+
+// ── Defaults ──────────────────────────────────────────
+async function loadPlannerDefaults() {
+  if (!window.fsDb) return;
+  const { collection, getDocs } = window.__fsFns;
+  try {
+    const [nodeSnap, slotSnap] = await Promise.all([
+      getDocs(collection(window.fsDb,'plannerDefaults_nodes')),
+      getDocs(collection(window.fsDb,'plannerDefaults_slots')),
+    ]);
+    nodeSnap.docs.forEach(d => {
+      const data = d.data();
+      const node = PLANNER_NODES.find(n => n.id === data.id);
+      if (node && data.label) node.label = data.label;
+    });
+    slotSnap.docs.forEach(d => {
+      const data = d.data();
+      if (!plannerState[data.nodeId]) plannerState[data.nodeId] = { label: null, players: {} };
+      plannerState[data.nodeId].players[data.slotIdx] = { name: data.name };
+    });
+  } catch(e) { console.error('loadPlannerDefaults:', e); }
+}
+
+window.saveCurrentAsDefault = async () => {
+  if (!window.fsDb) { window.toast('Not connected.', 'err'); return; }
+  if (!confirm('Save current layout as the new default for all guild members?')) return;
+  const { collection, getDocs, writeBatch, doc, addDoc, setDoc } = window.__fsFns;
+
+  try {
+    // Save labels
+    const labelSnap = await getDocs(collection(window.fsDb,'plannerDefaults_nodes'));
+    const labelBatch = writeBatch(window.fsDb);
+    labelSnap.docs.forEach(d => labelBatch.delete(d.ref));
+    await labelBatch.commit();
+    for (const node of PLANNER_NODES) {
+      const state = plannerState[node.id] || {};
+      const label = state.label !== null && state.label !== undefined ? state.label : node.label;
+      await addDoc(collection(window.fsDb,'plannerDefaults_nodes'), { id: node.id, label });
+    }
+
+    // Save player slots
+    const slotSnap = await getDocs(collection(window.fsDb,'plannerDefaults_slots'));
+    const slotBatch = writeBatch(window.fsDb);
+    slotSnap.docs.forEach(d => slotBatch.delete(d.ref));
+    await slotBatch.commit();
+    const currentSlots = await getDocs(collection(window.fsDb,'plannerSlots'));
+    for (const d of currentSlots.docs) {
+      const data = d.data();
+      await addDoc(collection(window.fsDb,'plannerDefaults_slots'), data);
+    }
+
+    window.toast('Saved as new default!', 'ok');
+  } catch(e) { window.toast('Save failed: ' + e.message, 'err'); }
+};
+
+window.resetPlannerToDefault = async () => {
+  if (!confirm('Reset to saved default?')) return;
+  if (!window.fsDb) return;
+  const { collection, getDocs, writeBatch, addDoc } = window.__fsFns;
+
+  // Clear live collections
+  const [nodeSnap, slotSnap] = await Promise.all([
+    getDocs(collection(window.fsDb,'plannerNodes')),
+    getDocs(collection(window.fsDb,'plannerSlots')),
+  ]);
+  const clearBatch = writeBatch(window.fsDb);
+  nodeSnap.docs.forEach(d => clearBatch.delete(d.ref));
+  slotSnap.docs.forEach(d => clearBatch.delete(d.ref));
+  await clearBatch.commit();
+
+  // Restore from defaults
+  const [defNodes, defSlots] = await Promise.all([
+    getDocs(collection(window.fsDb,'plannerDefaults_nodes')),
+    getDocs(collection(window.fsDb,'plannerDefaults_slots')),
+  ]);
+  for (const d of defNodes.docs) await addDoc(collection(window.fsDb,'plannerNodes'), d.data());
+  for (const d of defSlots.docs) await addDoc(collection(window.fsDb,'plannerSlots'), d.data());
+};
+
+// ── Export ────────────────────────────────────────────
+window.exportPlannerImage = () => {
+  const img   = document.getElementById('planner-img');
+  const mapEl = document.getElementById('planner-map');
+  if (!img || !mapEl) return;
+  const dispW = mapEl.offsetWidth;
+  const dispH = mapEl.offsetHeight;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = dispW;
+  canvas.height = dispH;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, dispW, dispH);
+
+  PLANNER_NODES.forEach(node => {
+    const state   = plannerState[node.id] || {};
+    const label   = state.label !== null && state.label !== undefined ? state.label : node.label;
+    const players = state.players || {};
+    const x = node.x / 100 * dispW;
+    const y = node.y / 100 * dispH;
+    const cardW = 130, slotH = 20, titleH = 22;
+    const cardH = titleH + node.slots * (slotH + 3) + 6;
+
+    // Card bg
+    ctx.fillStyle = 'rgba(10,8,30,0.85)';
+    ctx.beginPath(); ctx.roundRect(x, y, cardW, cardH, 8); ctx.fill();
+    ctx.strokeStyle = node.color + '88';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(x, y, cardW, cardH, 8); ctx.stroke();
+
+    // Dot
+    ctx.fillStyle = node.color;
+    ctx.beginPath(); ctx.arc(x+10, y+titleH/2, 4, 0, Math.PI*2); ctx.fill();
+
+    // Label
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 11px Inter,sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x+20, y+titleH/2);
+
+    // Player slots
+    for (let i = 0; i < node.slots; i++) {
+      const slotData = players[i] || {};
+      const name = slotData.name || '';
+      const sy = y + titleH + i * (slotH + 3);
+      ctx.fillStyle = 'rgba(255,255,255,0.07)';
+      ctx.beginPath(); ctx.roundRect(x+6, sy, cardW-12, slotH, 4); ctx.fill();
+      ctx.fillStyle = name ? '#e0d9ff' : '#555';
+      ctx.font = '11px Inter,sans-serif';
+      ctx.fillText(name || '—', x+13, sy+slotH/2);
+    }
+  });
+
+  const link = document.createElement('a');
+  link.download = 'war-planner.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  window.toast('Exported!', 'ok');
+};
+</script>
+
+</body>>
