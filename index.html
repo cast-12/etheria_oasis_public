@@ -545,387 +545,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc,
-         query, where, onSnapshot, writeBatch, setDoc }
-  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-// ═══════════════════════════════════════════════════════════
-// HARDCODE YOUR FIREBASE CONFIG HERE FOR VERCEL DEPLOYMENT:
-// ═══════════════════════════════════════════════════════════
-const HARDCODED_CONFIG = {
-  apiKey:      "AIzaSyDDSkAtsiANMnboxfoQsXd39bd9KJu6ABw",
-  authDomain:  "etheria-leads.firebaseapp.com",
-  projectId:   "etheria-leads",
-  appId:       "1:792684605120:web:3deb9f0fa8e131b31c8725"
-};
-
-const CFG_KEY = 'etheria_fb_v2';
-let fsDb = null;
-let entries = [];
-let unsub = null;
-
-// ── Utilities ───────────────────────────────────────────
-const esc  = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-window.esc = esc;
-const norm = s => (s||'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-const key  = (a,b,c) => [norm(a),norm(b),norm(c)].sort().join('|');
-
-// Nickname / alias map -- alias (normed) -> canonical normed name
-const ALIASES = {
-  'xc':'xuanchi',   'xuanchi':'xuanchi',
-  'xl':'xuanli',    'xuanli':'xuanli',
-  'ray':'raymerry', 'raymerry':'raymerry',
-  'fia':'fiamelia', 'fiamelia':'fiamelia',
-  'tia':'tiamat',   'tiamat':'tiamat',
-};
-function resolve(s) { const n = norm(s); return ALIASES[n] || n; }
-function allAliases(s) { const c = resolve(s); return Object.keys(ALIASES).filter(k => ALIASES[k]===c); }
-
-window.toast = (msg, type='') => {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'toast show ' + type;
-  setTimeout(() => el.className = 'toast', 2800);
-};
-
-function setConn(state, text) {
-  document.getElementById('conn-dot').className = 'conn-dot ' + state;
-  document.getElementById('conn-text').textContent = text;
-}
-
-// ── Init ────────────────────────────────────────────────
-async function initFB(cfg) {
-  try {
-    const app = initializeApp(cfg);
-    fsDb = getFirestore(app);
-    setConn('on', 'Connected');
-    document.getElementById('setup-banner').style.display = 'none';
-
-    // Expose Firestore fns for non-module stats script
-    window.__fsFns = { collection, addDoc, doc, setDoc, deleteDoc, onSnapshot, getDocs, query, where, writeBatch };
-    window.fsDb = fsDb;
-
-    // Retry until initStatsListener is defined by non-module script
-    const _db = fsDb, _fns = window.__fsFns;
-    let _n = 0, _t = setInterval(() => {
-      if (window.initStatsListener) { window.initStatsListener(_db, _fns); clearInterval(_t); }
-      if (++_n > 50) clearInterval(_t);
-    }, 100);
-  } catch(e) {
-    setConn('err','Config error');
-    window.toast('Firebase init failed: ' + e.message, 'err');
-  }
-}
-
-// ── Save config from setup form ─────────────────────────
-window.saveConfig = async () => {
-  const cfg = {
-    apiKey:     document.getElementById('cfg-apiKey').value.trim(),
-    authDomain: document.getElementById('cfg-authDomain').value.trim(),
-    projectId:  document.getElementById('cfg-projectId').value.trim(),
-    appId:      document.getElementById('cfg-appId').value.trim(),
-  };
-  if (!cfg.apiKey || !cfg.projectId) { window.toast('Fill in at least apiKey and projectId.','err'); return; }
-  localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-  await initFB(cfg);
-};
-
-// ── Section nav ─────────────────────────────────────────
-window.showSection = name => {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('section-' + name).classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
-  if (name === 'data') renderList();
-  if (name === 'stats' && window.renderStats) renderStats();
-  if (name === 'roster' && window.renderRoster) renderRoster();
-  if (name === 'planner' && window.initPlanner) initPlanner();
-};
-
-// ── Lookup ──────────────────────────────────────────────
-window.doLookup = () => {
-  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
-
-  const e1 = document.getElementById('enemy1').value.trim();
-  const e2 = document.getElementById('enemy2').value.trim();
-  const e3 = document.getElementById('enemy3').value.trim();
-
-  // Collect only the units that were actually entered
-  const searched = [e1, e2, e3].filter(Boolean);
-  if (!searched.length) { window.toast('Enter at least one unit to search.','err'); return; }
-
-  // Normalise each searched unit and match against stored enemy units
-  // An entry matches if ALL searched units appear among its 3 enemy slots
-  const normed = searched.map(resolve);
-  const hits = entries.filter(entry => {
-    const entryUnits = [resolve(entry.e1), resolve(entry.e2), resolve(entry.e3)];
-    return normed.every(u => entryUnits.includes(u));
-  });
-
-  const ra = document.getElementById('result-area');
-  const searchLabel = searched.join(' · ');
-
-  if (!hits.length) {
-    ra.innerHTML = `
-      <div class="result-empty">
-        <strong>No counter found</strong>
-        <p>No data yet for <em>${esc(searchLabel)}</em>.</p>
-        <button class="suggest-btn" onclick="prefillAdd('${esc(e1)}','${esc(e2)}','${esc(e3)}')">
-          + Add a counter for this team
-        </button>
-      </div>`;
-  } else {
-    ra.innerHTML = `<div class="result-multi">${hits.map((m,i) => `
-      <div class="result-found">
-        <div class="result-badge">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M3 5l1.5 1.5L7 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Counter ${i+1} of ${hits.length}
-        </div>
-        <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;">vs ${esc(m.e1)} · ${esc(m.e2)} · ${esc(m.e3)}</div>
-        ${m.name?`<div class="result-team-name">${esc(m.name)}</div>`:''}
-        <div class="result-units">
-          <span class="unit-pill">${esc(m.c1)}</span>
-          <span class="unit-pill">${esc(m.c2)}</span>
-          <span class="unit-pill">${esc(m.c3)}</span>
-        </div>
-        ${m.note?`<div class="result-note">${esc(m.note)}</div>`:''}
-      </div>`).join('')}</div>`;
-  }
-};
-
-window.prefillAdd = (e1,e2,e3) => {
-  showSection('data');
-  setTimeout(() => {
-    document.getElementById('a-e1').value = e1;
-    document.getElementById('a-e2').value = e2;
-    document.getElementById('a-e3').value = e3;
-    document.getElementById('a-c1').focus();
-  }, 60);
-};
-
-// ── Add entry ───────────────────────────────────────────
-window.addEntry = async () => {
-  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
-  const [e1,e2,e3,c1,c2,c3] = ['a-e1','a-e2','a-e3','a-c1','a-c2','a-c3'].map(id => document.getElementById(id).value.trim());
-  if (!e1||!e2||!e3) { window.toast('Fill in all 3 enemy units.','err'); return; }
-  if (!c1||!c2||!c3) { window.toast('Fill in all 3 counter units.','err'); return; }
-  const name = document.getElementById('a-name').value.trim();
-  const note = document.getElementById('a-note').value.trim();
-  const btn  = document.getElementById('add-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  try {
-    await addDoc(collection(fsDb,'counters'), { key:key(e1,e2,e3), e1,e2,e3,c1,c2,c3,name,note,added:Date.now() });
-    ['a-e1','a-e2','a-e3','a-c1','a-c2','a-c3','a-name','a-note'].forEach(id => document.getElementById(id).value='');
-    window.toast('Entry saved!','ok');
-  } catch(e) {
-    window.toast('Save failed: '+e.message,'err');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Save Entry';
-  }
-};
-
-window.deleteEntry = async id => {
-  if (!fsDb) return;
-  try { await deleteDoc(doc(fsDb,'counters',id)); window.toast('Removed.'); }
-  catch(e) { window.toast('Delete failed: '+e.message,'err'); }
-};
-
-window.clearAll = async () => {
-  if (!fsDb) return;
-  if (!confirm('Delete ALL '+entries.length+' entries for everyone? Cannot be undone.')) return;
-  try {
-    const snap = await getDocs(collection(fsDb,'counters'));
-    const batch = writeBatch(fsDb);
-    snap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-    window.toast('All data cleared.');
-  } catch(e) { window.toast('Clear failed: '+e.message,'err'); }
-};
-
-// ── Render list ─────────────────────────────────────────
-window.renderList = () => {
-  const list = document.getElementById('entry-list');
-  const q = (document.getElementById('search-input').value||'').trim().toLowerCase();
-  let filtered = q
-    ? entries.filter(e => { const qa = allAliases(q); return [e.e1,e.e2,e.e3,e.c1,e.c2,e.c3,e.name,e.note].some(v => { if (!v) return false; const vn = norm(v); const vr = resolve(v); return v.toLowerCase().includes(q) || qa.includes(vn) || qa.includes(vr); }); })
-    : entries;
-
-  if (!filtered.length) {
-    list.innerHTML = `<div class="empty-state">${q?`No entries match "${esc(q)}".`:(fsDb?'No entries yet. Add your first matchup!':'Connect to Firebase to load data.')}</div>`;
-    return;
-  }
-  list.innerHTML = [...filtered].reverse().map(e => `
-    <div class="entry-row">
-      <div class="entry-body">
-        <div class="entry-enemy">${esc(e.e1)} · ${esc(e.e2)} · ${esc(e.e3)}</div>
-        <div class="entry-counter">&#9658; ${esc(e.c1)} · ${esc(e.c2)} · ${esc(e.c3)}</div>
-      </div>
-      <div class="entry-actions">
-        <button class="entry-edit" onclick="openEditModal('${esc(e.id)}')" title="Edit entry" aria-label="Edit entry">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M9 2l2 2-7 7H2V9l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-        </button>
-        <button class="entry-del" onclick="deleteEntry('${esc(e.id)}')" title="Remove entry" aria-label="Remove entry">✕</button>
-      </div>
-    </div>`).join('');
-};
-
-// ── Export / Import ─────────────────────────────────────
-window.exportData = () => {
-  if (!entries.length) { window.toast('No data to export.','err'); return; }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(entries,null,2)],{type:'application/json'}));
-  a.download = 'etheria_gw_counters.json'; a.click();
-  window.toast('Exported!','ok');
-};
-
-window.importData = async event => {
-  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
-  const file = event.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async e => {
-    try {
-      const arr = JSON.parse(e.target.result);
-      if (!Array.isArray(arr)) throw new Error('Bad format');
-      let added = 0;
-      for (const entry of arr) {
-        if (entry.e1 && entry.c1) {
-          await addDoc(collection(fsDb,'counters'), {
-            key:key(entry.e1,entry.e2||'',entry.e3||''),
-            e1:entry.e1||'',e2:entry.e2||'',e3:entry.e3||'',
-            c1:entry.c1||'',c2:entry.c2||'',c3:entry.c3||'',
-            name:entry.name||'',note:entry.note||'',added:entry.added||Date.now()
-          });
-          added++;
-        }
-      }
-      window.toast('Imported '+added+' entries.','ok');
-    } catch(err) { window.toast('Import failed: '+err.message,'err'); }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
-};
-
-
-// ── Edit modal ──────────────────────────────────────────
-window.openEditModal = id => {
-  const entry = entries.find(e => e.id === id);
-  if (!entry) return;
-  document.getElementById('edit-id').value   = id;
-  document.getElementById('edit-e1').value   = entry.e1 || '';
-  document.getElementById('edit-e2').value   = entry.e2 || '';
-  document.getElementById('edit-e3').value   = entry.e3 || '';
-  document.getElementById('edit-c1').value   = entry.c1 || '';
-  document.getElementById('edit-c2').value   = entry.c2 || '';
-  document.getElementById('edit-c3').value   = entry.c3 || '';
-  document.getElementById('edit-name').value = entry.name || '';
-  document.getElementById('edit-note').value = entry.note || '';
-  document.getElementById('edit-modal').classList.add('open');
-};
-
-window.closeEditModal = () => {
-  document.getElementById('edit-modal').classList.remove('open');
-};
-
-// Close on backdrop click
-document.getElementById('edit-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeEditModal();
-});
-
-window.saveEdit = async () => {
-  if (!fsDb) return;
-  const id = document.getElementById('edit-id').value;
-  const e1 = document.getElementById('edit-e1').value.trim();
-  const e2 = document.getElementById('edit-e2').value.trim();
-  const e3 = document.getElementById('edit-e3').value.trim();
-  const c1 = document.getElementById('edit-c1').value.trim();
-  const c2 = document.getElementById('edit-c2').value.trim();
-  const c3 = document.getElementById('edit-c3').value.trim();
-  const name = document.getElementById('edit-name').value.trim();
-  const note = document.getElementById('edit-note').value.trim();
-
-  if (!e1) { window.toast('Enemy Unit 1 is required.','err'); return; }
-  if (!c1) { window.toast('Counter Unit 1 is required.','err'); return; }
-
-  const btn = document.querySelector('#edit-modal .btn-primary');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  try {
-    await setDoc(doc(fsDb,'counters',id), {
-      key: key(e1,e2,e3), e1,e2,e3,c1,c2,c3,name,note, added: Date.now()
-    });
-    closeEditModal();
-    window.toast('Entry updated!','ok');
-  } catch(err) {
-    window.toast('Update failed: '+err.message,'err');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Save Changes';
-  }
-};
-
-// ── Import from XLSX (Mapping sheet) ────────────────────
-window.importXlsx = async event => {
-  if (!fsDb) { window.toast('Not connected to Firebase yet.','err'); return; }
-  const file = event.target.files[0]; if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = async e => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-
-      // Find the Mapping sheet (case-insensitive)
-      const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'mapping');
-      if (!sheetName) throw new Error('No "Mapping" sheet found in this file.');
-      const ws = wb.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
-      let added = 0, skipped = 0;
-      for (const row of rows) {
-        // Column headers: Unit #1, Unit #2, Unit #3, Beat by
-        const e1 = (row['Unit #1'] || '').toString().trim();
-        const e2 = (row['Unit #2'] || '').toString().trim();
-        const e3 = (row['Unit #3'] || '').toString().trim();
-        const beatBy = (row['Beat by'] || '').toString().trim();
-
-        if (!e1 || !beatBy) { skipped++; continue; }
-
-        // Split "Beat by" by comma into up to 3 counter units
-        const parts = beatBy.split(',').map(s => s.trim()).filter(Boolean);
-        const c1 = parts[0] || '';
-        const c2 = parts[1] || '';
-        const c3 = parts[2] || '';
-
-        if (!c1) { skipped++; continue; }
-
-        await addDoc(collection(fsDb, 'counters'), {
-          key: key(e1, e2, e3),
-          e1, e2, e3, c1, c2, c3,
-          name: '', note: '',
-          added: Date.now()
-        });
-        added++;
-      }
-
-      window.toast(`Imported ${added} entries${skipped ? `, skipped ${skipped}` : ''}.`, 'ok');
-    } catch(err) {
-      window.toast('XLSX import failed: ' + err.message, 'err');
-    }
-  };
-  reader.readAsArrayBuffer(file);
-  event.target.value = '';
-};
-
-// ── Auto-init ────────────────────────────────────────────
-if (HARDCODED_CONFIG) {
-  initFB(HARDCODED_CONFIG);
-} else {
-  try {
-    const saved = JSON.parse(localStorage.getItem(CFG_KEY));
-    if (saved) initFB(saved);
-  } catch {}
-}
-
-</script>
 
 <script>
 window.showSection = name => {
@@ -945,6 +565,36 @@ window.toast = (msg, type='') => {
 window.renderList = () => {};
 window.openAddWarModal = () => {};
 window.closeAddWarModal = () => {};
+</script>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc,
+         query, where, onSnapshot, writeBatch, setDoc }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const cfg = {
+  apiKey:      "AIzaSyDDSkAtsiANMnboxfoQsXd39bd9KJu6ABw",
+  authDomain:  "etheria-leads.firebaseapp.com",
+  projectId:   "etheria-leads",
+  appId:       "1:792684605120:web:3deb9f0fa8e131b31c8725"
+};
+
+const app  = initializeApp(cfg);
+const db   = getFirestore(app);
+const fns  = { collection, addDoc, getDocs, deleteDoc, doc, query, where, onSnapshot, writeBatch, setDoc };
+window.fsDb    = db;
+window.__fsFns = fns;
+
+document.getElementById('conn-dot').className  = 'conn-dot on';
+document.getElementById('conn-text').textContent = 'Connected';
+
+// Wait for initStatsListener to be defined by the non-module script
+let n = 0;
+const t = setInterval(() => {
+  if (window.initStatsListener) { window.initStatsListener(db, fns); clearInterval(t); }
+  if (++n > 50) clearInterval(t);
+}, 100);
 </script>
 
 <script>
