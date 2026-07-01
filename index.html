@@ -623,12 +623,12 @@ window.initStatsListener = function(db, fns) {
   onSnapshot(collection(window.fsDb,'wars'), snap => {
     warsMeta = {};
     snap.docs.forEach(d => { warsMeta[d.id] = d.data(); });
-    rebuildWarChips();
+    if (window.rebuildWarChips) rebuildWarChips();
   });
   statsUnsub = onSnapshot(collection(window.fsDb,'playerstats'), snap => {
     statsEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    rebuildWarChips();
-    renderStats();
+    if (window.rebuildWarChips) rebuildWarChips();
+    if (window.renderStats) renderStats();
     if (window.renderRoster) renderRoster();
   });
 };
@@ -643,12 +643,9 @@ window.openStatModal = (entry) => {
   document.getElementById('sm-dw').value      = entry ? (entry.dWins||0) : '';
   document.getElementById('sm-dl').value      = entry ? (entry.dLoss||0) : '';
   document.getElementById('stat-modal-title').textContent = entry ? 'Edit Player Stats' : 'Add Player Stats';
-  document.getElementById('stat-modal').classList.add('open');
-  setTimeout(() => document.getElementById('sm-player').focus(), 60);
+    setTimeout(() => document.getElementById('sm-player').focus(), 60);
 };
-window.closeStatModal = () => document.getElementById('stat-modal').classList.remove('open');
-document.getElementById('stat-modal').addEventListener('click', e => { if (e.target===e.currentTarget) closeStatModal(); });
-
+window.closeStatModal = () => 
 window.saveStat = async () => {
   if (!window.fsDb) { window.toast('Not connected to Firebase.','err'); return; }
   const player = document.getElementById('sm-player').value.trim();
@@ -817,12 +814,9 @@ window.openEditWarModal = async name => {
   document.getElementById('ew-atk-rows').innerHTML = atkHtml;
   document.getElementById('ew-def-rows').innerHTML = defHtml;
 
-  document.getElementById('edit-war-modal').classList.add('open');
-};
+  };
 
-window.closeEditWarModal = () => document.getElementById('edit-war-modal').classList.remove('open');
-document.getElementById('edit-war-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeEditWarModal();
+window.closeEditWarModal = () =>   if (e.target === e.currentTarget) closeEditWarModal();
 });
 
 window.saveEditWar = async () => {
@@ -1249,20 +1243,16 @@ window.openAddWarModal = () => {
   }
 
   // Auto-save on any input change
-  const modal = document.getElementById('add-war-modal');
-  modal.querySelectorAll('input').forEach(inp => {
+  const modal =   modal.querySelectorAll('input').forEach(inp => {
     inp.addEventListener('input', saveWarDraft);
   });
   // Also watch dynamically added rows
   modal.addEventListener('input', saveWarDraft);
 
-  document.getElementById('add-war-modal').classList.add('open');
-  setTimeout(() => document.getElementById('aw-war-name').focus(), 60);
+    setTimeout(() => document.getElementById('aw-war-name').focus(), 60);
 };
 
-window.closeAddWarModal = () => document.getElementById('add-war-modal').classList.remove('open');
-document.getElementById('add-war-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeAddWarModal();
+window.closeAddWarModal = () =>   if (e.target === e.currentTarget) closeAddWarModal();
 });
 
 window.saveAddWar = async () => {
