@@ -101,7 +101,7 @@
   main { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
 
   .section { display: none; }
-  #section-planner.active { display: flex; flex-direction: column; align-items: center; }
+  #section-planner.active { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 100%; }
   .section.active { display: block; }
 
   /* ── Setup banner ────────────────────────────────────── */
@@ -840,7 +840,7 @@
 
 
   <!-- WAR PLANNER -->
-  <div id="section-planner" class="section" style="max-width:100%;padding-left:0;padding-right:0">
+  <div id="section-planner" class="section" style="max-width:100%;padding-left:0;padding-right:0;width:100%">
     <h1 class="page-heading">GvG Planner</h1>
 
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem;justify-content:center">
@@ -851,7 +851,7 @@
     </div>
 
     <!-- Map canvas -->
-    <div style="position:relative;width:80vw;max-width:1100px;border-radius:12px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1920/1071" id="planner-map">
+    <div style="position:relative;width:80vw;max-width:1100px;min-height:200px;border-radius:12px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1920/1071" id="planner-map">
       <div style="position:absolute;inset:0;overflow:hidden;border-radius:12px;z-index:0">
   <img src="standard-garrison-default.webp" id="planner-img" style="width:100%;display:block;pointer-events:none;filter:brightness(0.75)" draggable="false">
   <div style="position:absolute;inset:0;background:rgba(4,3,18,0.15)"></div>
@@ -2507,7 +2507,7 @@ let plannerUnsub2 = null;
 
 // ── Init ──────────────────────────────────────────────
 window.initPlanner = async () => {
-  if (plannerInited) { renderPlanner(); return; }
+  if (plannerInited) { renderPlanner(); scalePlannerForMobile && scalePlannerForMobile(); return; }
   if (!window.fsDb || !window.__fsFns) { setTimeout(initPlanner, 200); return; }
   plannerInited = true;
 
