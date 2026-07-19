@@ -1682,6 +1682,7 @@ if (HARDCODED_CONFIG) {
   // Auto-init: set up auth then gate the app
 // No login — connect directly
 // Auth gate
+window._hardcodedCfg = HARDCODED_CONFIG;
 (async () => {
   const _preApp = initializeApp(HARDCODED_CONFIG);
   const _auth   = getAuth(_preApp);
@@ -2768,13 +2769,48 @@ window.doSignup = async () => {
   if (!email) { errEl.textContent = 'Enter your email.'; return; }
   if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
 
-  btn.disabled = true; btn.textContent = 'Creating account…';
+  btn.disabled = true; btn.textContent = 'Checking name…';
+  errEl.textContent = '';
+
   try {
+    // Check if player name is already claimed in Firestore
+    // We need a temp db connection for this check
+    const { initializeApp: _ia, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const { getFirestore, collection, query, where, getDocs, setDoc, doc }
+      = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+    const _apps = getApps();
+    const _app  = _apps.length ? _apps[0] : _ia(window._hardcodedCfg);
+    const _db   = getFirestore(_app);
+
+    // Check playerClaims collection
+    const claimsRef = collection(_db, 'playerClaims');
+    const q = query(claimsRef, where('playerName', '==', name));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      errEl.textContent = 'That player name is already taken. Contact an admin if this is your name.';
+      btn.disabled = false; btn.textContent = 'Create Account';
+      return;
+    }
+
+    btn.textContent = 'Creating account…';
+
+    // Create Firebase Auth account
     const cred = await window._signUp(window._preAuth, email, pass);
-    // Save display name
     await window._updateProfile(cred.user, { displayName: name });
+
+    // Claim the player name
+    await setDoc(doc(_db, 'playerClaims', name.toLowerCase()), {
+      playerName: name,
+      email: email,
+      uid: cred.user.uid,
+      claimedAt: Date.now()
+    });
+
     window.currentPlayer = name;
-    // onAuthStateChanged will fire and show the app
+    // onAuthStateChanged fires and shows the app
+
   } catch(e) {
     errEl.textContent = e.code === 'auth/email-already-in-use'
       ? 'That email is already registered. Try signing in.'
