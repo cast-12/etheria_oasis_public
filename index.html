@@ -665,7 +665,71 @@
 </head>
 <body>
 
-<div id="app-root">
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" style="display:flex;position:fixed;inset:0;background:#09071A;z-index:9999;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto">
+  <div style="width:100%;max-width:400px;padding:1rem 0">
+    <!-- Logo -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:2rem">
+      <div style="width:44px;height:44px;background:#7C3AED;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">⚔️</div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:#e2e0f0">Etheria GW</div>
+        <div style="font-size:12px;color:#6b7280">Guild War Planner</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex;background:rgba(255,255,255,0.04);border-radius:10px;padding:4px;margin-bottom:1.5rem;border:1px solid rgba(255,255,255,0.08)">
+      <button id="auth-tab-login" onclick="switchAuthTab('login')"
+        style="flex:1;padding:8px;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;background:#7C3AED;color:#fff;transition:all 0.15s">Sign In</button>
+      <button id="auth-tab-signup" onclick="switchAuthTab('signup')"
+        style="flex:1;padding:8px;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;background:transparent;color:#6b7280;transition:all 0.15s">Sign Up</button>
+    </div>
+
+    <!-- Card -->
+    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(124,58,237,0.25);border-radius:14px;padding:1.75rem">
+
+      <!-- SIGN IN form -->
+      <div id="auth-login-form">
+        <label style="display:block;font-size:11px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Email</label>
+        <input id="login-email" type="email" placeholder="your@email.com" autocomplete="email"
+          onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()"
+          style="width:100%;margin-bottom:1rem">
+        <label style="display:block;font-size:11px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Password</label>
+        <input id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password"
+          onkeydown="if(event.key==='Enter')window.doLogin()"
+          style="width:100%;margin-bottom:1.25rem">
+        <p id="login-err" style="color:#f87171;font-size:13px;min-height:18px;margin-bottom:0.75rem"></p>
+        <button id="login-btn" onclick="window.doLogin()"
+          style="width:100%;background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">Sign In</button>
+      </div>
+
+      <!-- SIGN UP form -->
+      <div id="auth-signup-form" style="display:none">
+        <label style="display:block;font-size:11px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Player Name</label>
+        <input id="signup-name" type="text" placeholder="Your in-game name" autocomplete="off"
+          onkeydown="if(event.key==='Enter')document.getElementById('signup-email').focus()"
+          style="width:100%;margin-bottom:1rem">
+        <p style="font-size:11px;color:#6b7280;margin-top:-0.75rem;margin-bottom:1rem">Must match your name in the war roster exactly.</p>
+        <label style="display:block;font-size:11px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Email</label>
+        <input id="signup-email" type="email" placeholder="your@email.com" autocomplete="email"
+          onkeydown="if(event.key==='Enter')document.getElementById('signup-pass').focus()"
+          style="width:100%;margin-bottom:1rem">
+        <label style="display:block;font-size:11px;color:#9ca3af;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Password</label>
+        <input id="signup-pass" type="password" placeholder="Min 6 characters" autocomplete="new-password"
+          onkeydown="if(event.key==='Enter')window.doSignup()"
+          style="width:100%;margin-bottom:1.25rem">
+        <p id="signup-err" style="color:#f87171;font-size:13px;min-height:18px;margin-bottom:0.75rem"></p>
+        <button id="signup-btn" onclick="window.doSignup()"
+          style="width:100%;background:#7C3AED;color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif">Create Account</button>
+      </div>
+
+    </div>
+    <p style="text-align:center;font-size:12px;color:#4b5563;margin-top:1.25rem">Access restricted to guild members only.</p>
+  </div>
+</div>
+
+<div id="app-root" style="display:none">
 <header>
   <div class="logo">
     <div class="logo-hex" aria-hidden="true">⚔</div>
@@ -986,7 +1050,8 @@
   <div id="section-invest" class="section active">
     <p class="page-eyebrow">Guild War on Etheria Restart</p>
     <h1 class="page-heading">Unit Investment</h1>
-    <p class="page-sub">Track dupes, lattice, and awakening for each unit. Select your name to load your data.</p>
+    <p class="page-sub">Track dupes, lattice, and awakening for each unit. Your data is saved per player.</p>
+    <div id="invest-player-title" style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--purple-pale);margin-bottom:0.5rem;min-height:28px"></div>
 
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem">
       <div class="invest-player-dd" id="invest-dd-wrap">
@@ -1073,7 +1138,7 @@
 
 <script type="module">
 import { initializeApp }           from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc,
          query, where, onSnapshot, writeBatch, setDoc }
@@ -1616,7 +1681,36 @@ window.importXlsx = async event => {
 if (HARDCODED_CONFIG) {
   // Auto-init: set up auth then gate the app
 // No login — connect directly
-initFB(HARDCODED_CONFIG);
+// Auth gate
+(async () => {
+  const _preApp = initializeApp(HARDCODED_CONFIG);
+  const _auth   = getAuth(_preApp);
+  window._preAuth = _auth;
+  window._signIn = signInWithEmailAndPassword;
+  window._signUp = createUserWithEmailAndPassword;
+  window._updateProfile = updateProfile;
+  window._signOut = signOut;
+  onAuthStateChanged(_auth, user => {
+    if (user) {
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app-root').style.display = '';
+      // Store display name as current player
+      window.currentPlayer = user.displayName || '';
+      const hn = document.getElementById('header-player-name');
+      if (hn) hn.textContent = window.currentPlayer ? '⚔️ ' + window.currentPlayer : '';
+      // Pre-select player in invest tab
+      if (window.currentPlayer) {
+        investPlayer = window.currentPlayer;
+        const label = document.getElementById('invest-dd-label');
+        if (label) label.textContent = window.currentPlayer;
+      }
+      if (!window.fsDb) initFB(HARDCODED_CONFIG);
+    } else {
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('app-root').style.display = 'none';
+    }
+  });
+})();
 } else {
   try {
     const saved = JSON.parse(localStorage.getItem(CFG_KEY));
@@ -2637,27 +2731,62 @@ window.initStatsListener = function(db, fns) {
 };
 
 
+window.switchAuthTab = tab => {
+  const isLogin = tab === 'login';
+  document.getElementById('auth-login-form').style.display  = isLogin ? '' : 'none';
+  document.getElementById('auth-signup-form').style.display = isLogin ? 'none' : '';
+  document.getElementById('auth-tab-login').style.background  = isLogin ? '#7C3AED' : 'transparent';
+  document.getElementById('auth-tab-login').style.color       = isLogin ? '#fff' : '#6b7280';
+  document.getElementById('auth-tab-signup').style.background = isLogin ? 'transparent' : '#7C3AED';
+  document.getElementById('auth-tab-signup').style.color      = isLogin ? '#6b7280' : '#fff';
+};
+
 window.doLogin = async () => {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-err');
   const btn   = document.getElementById('login-btn');
   if (!email || !pass) { errEl.textContent = 'Enter email and password.'; return; }
-  btn.disabled = true;
-  btn.textContent = 'Signing in…';
+  btn.disabled = true; btn.textContent = 'Signing in…';
   try {
     await window._signIn(window._preAuth, email, pass);
   } catch(e) {
-    errEl.textContent = e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found'
-      ? 'Invalid email or password.'
+    errEl.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(e.code)
+      ? 'Invalid email or password.' : 'Error: ' + e.message;
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+};
+
+window.doSignup = async () => {
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass  = document.getElementById('signup-pass').value;
+  const errEl = document.getElementById('signup-err');
+  const btn   = document.getElementById('signup-btn');
+
+  if (!name)  { errEl.textContent = 'Enter your player name.'; return; }
+  if (!email) { errEl.textContent = 'Enter your email.'; return; }
+  if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Creating account…';
+  try {
+    const cred = await window._signUp(window._preAuth, email, pass);
+    // Save display name
+    await window._updateProfile(cred.user, { displayName: name });
+    window.currentPlayer = name;
+    // onAuthStateChanged will fire and show the app
+  } catch(e) {
+    errEl.textContent = e.code === 'auth/email-already-in-use'
+      ? 'That email is already registered. Try signing in.'
+      : e.code === 'auth/weak-password' ? 'Password is too weak.'
       : 'Error: ' + e.message;
-    btn.disabled = false;
-    btn.textContent = 'Sign In';
+    btn.disabled = false; btn.textContent = 'Create Account';
   }
 };
 
 window.doLogout = async () => {
   if (window._preAuth) await window._signOut(window._preAuth);
+  window.currentPlayer = '';
 };
 
 </script>
@@ -3347,10 +3476,17 @@ window.renderInvest = () => {
   const statusEl = document.getElementById('invest-status');
   if (!grid) return;
 
+  // If logged in as a known player, lock to that player
+  if (window.currentPlayer && !investPlayer) investPlayer = window.currentPlayer;
+
   if (!investPlayer) {
     grid.innerHTML = '<p style="color:var(--text-3);font-size:14px;grid-column:1/-1">Select a player above to view their unit investment.</p>';
     return;
   }
+
+  // Show/hide player selector based on whether they own their data
+  const ddWrap = document.getElementById('invest-dd-wrap');
+  if (ddWrap) ddWrap.style.display = (window.currentPlayer) ? 'none' : '';
 
   const search = (document.getElementById('invest-search')?.value||'').toLowerCase().trim();
   let units = INVEST_UNITS;
@@ -3359,6 +3495,9 @@ window.renderInvest = () => {
   const playerUnits = investData[investPlayer]?.units || {};
   const filledCount = Object.values(playerUnits).filter(d => d && (d.dupes || d.lattice || d.awakened)).length;
   if (statusEl) statusEl.textContent = investPlayer + ' · ' + filledCount + ' units tracked';
+  // Show player name prominently if it's their own data
+  const playerTitle = document.getElementById('invest-player-title');
+  if (playerTitle) playerTitle.textContent = investPlayer;
 
   const esc2 = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
