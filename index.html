@@ -2507,7 +2507,7 @@ let plannerUnsub2 = null;
 
 // ── Init ──────────────────────────────────────────────
 window.initPlanner = async () => {
-  if (plannerInited) { renderPlanner(); scalePlannerForMobile && scalePlannerForMobile(); return; }
+  if (plannerInited) { renderPlanner(); return; }
   if (!window.fsDb || !window.__fsFns) { setTimeout(initPlanner, 200); return; }
   plannerInited = true;
 
@@ -2819,30 +2819,35 @@ window.exportPlannerImage = () => {
 function scalePlannerForMobile() {
   const map = document.getElementById('planner-map');
   if (!map) return;
-  if (window.innerWidth > 700) {
-    map.style.transform = '';
-    map.style.transformOrigin = '';
-    map.style.marginBottom = '';
-    map.style.width = '';
-    map.style.maxWidth = '';
-    return;
-  }
-  const padding = 32;
-  const available = window.innerWidth - padding;
-  const mapNaturalWidth = map.offsetWidth || 800;
-  const scale = available / mapNaturalWidth;
-  const mapHeight = map.offsetHeight || (mapNaturalWidth / (1920/1071));
-  map.style.transformOrigin = 'top left';
-  map.style.transform = `scale(${scale})`;
-  map.style.marginBottom = `-${mapHeight * (1 - scale)}px`;
+
+  // Always reset first
+  map.style.transform = '';
+  map.style.transformOrigin = '';
+  map.style.marginBottom = '';
+  map.style.width = '';
+  map.style.maxWidth = '';
+
+  if (window.innerWidth > 700) return; // Desktop: nothing to do
+
+  // Mobile: wait for layout, then scale
+  requestAnimationFrame(() => {
+    const naturalWidth = map.getBoundingClientRect().width;
+    if (!naturalWidth) return;
+    const available = window.innerWidth - 24;
+    const scale = Math.min(1, available / naturalWidth);
+    if (scale >= 1) return;
+    const mapHeight = naturalWidth / (1920 / 1071);
+    map.style.transformOrigin = 'top left';
+    map.style.transform = `scale(${scale})`;
+    map.style.marginBottom = `-${mapHeight * (1 - scale)}px`;
+  });
 }
 
 window.addEventListener('resize', scalePlannerForMobile);
 const _origShowSectionPlanner = window.showSection;
 window.showSection = name => {
   _origShowSectionPlanner(name);
-  if (name === 'planner') setTimeout(scalePlannerForMobile, 80);
+  if (name === 'planner') setTimeout(scalePlannerForMobile, 100);
 };
-document.addEventListener('DOMContentLoaded', () => setTimeout(scalePlannerForMobile, 150));
 </script>
 </body>>
