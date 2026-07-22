@@ -1302,22 +1302,27 @@ let investInited = false;
 
 window.initInvest = () => {
   if (!window.fsDb || !window.__fsFns) { setTimeout(window.initInvest, 200); return; }
+  if (!window.currentPlayer) { setTimeout(window.initInvest, 200); return; }
   window.populateInvestPlayers();
   renderInvest();
   if (investInited) return;
   investInited = true;
-  const { collection, onSnapshot } = window.__fsFns;
-  onSnapshot(collection(window.fsDb, 'unitInvestment'), snap => {
-    const prevDocIds = {};
-    Object.keys(investData).forEach(p => { if (investData[p].docId) prevDocIds[p] = investData[p].docId; });
-    investData = {};
-    snap.docs.forEach(d => {
-      const data = d.data();
-      investData[data.player] = { docId: d.id, units: data.units || {} };
-    });
-    populateInvestPlayers();
-    renderInvest();
-  });
+  const { collection, query, where, onSnapshot } = window.__fsFns;
+  // Only ever subscribe to THIS account's own player doc — never the
+  // whole unitInvestment collection. Other players' data is never
+  // downloaded to the browser at all, not just hidden from the UI.
+  onSnapshot(
+    query(collection(window.fsDb, 'unitInvestment'), where('player', '==', window.currentPlayer)),
+    snap => {
+      investData = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        investData[data.player] = { docId: d.id, units: data.units || {} };
+      });
+      populateInvestPlayers();
+      renderInvest();
+    }
+  );
 };
 
 window.populateInvestPlayers = function populateInvestPlayers() {
