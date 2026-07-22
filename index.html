@@ -1152,7 +1152,102 @@ window._hardcodedCfg = HARDCODED_CONFIG;
 // Expose module-scoped vars to other scripts
 window.UNIT_PORTRAITS = UNIT_PORTRAITS;
 window.EMBEDDED_PORTRAITS = EMBEDDED_PORTRAITS;
-window.unitPortraitURL = unitPortraitURL;
+
+window.switchAuthTab = tab => {
+  const isLogin = tab === 'login';
+  document.getElementById('auth-login-form').style.display  = isLogin ? '' : 'none';
+  document.getElementById('auth-signup-form').style.display = isLogin ? 'none' : '';
+  document.getElementById('auth-tab-login').style.background  = isLogin ? '#7C3AED' : 'transparent';
+  document.getElementById('auth-tab-login').style.color       = isLogin ? '#fff' : '#6b7280';
+  document.getElementById('auth-tab-signup').style.background = isLogin ? 'transparent' : '#7C3AED';
+  document.getElementById('auth-tab-signup').style.color      = isLogin ? '#6b7280' : '#fff';
+};
+
+window.doLogin = async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-err');
+  const btn   = document.getElementById('login-btn');
+  if (!email || !pass) { errEl.textContent = 'Enter email and password.'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    await window._signIn(window._preAuth, email, pass);
+  } catch(e) {
+    errEl.textContent = ['auth/invalid-credential','auth/wrong-password','auth/user-not-found'].includes(e.code)
+      ? 'Invalid email or password.' : 'Error: ' + e.message;
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+};
+
+window.doSignup = async () => {
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass  = document.getElementById('signup-pass').value;
+  const errEl = document.getElementById('signup-err');
+  const btn   = document.getElementById('signup-btn');
+
+  if (!name)  { errEl.textContent = 'Enter your player name.'; return; }
+  if (!email) { errEl.textContent = 'Enter your email.'; return; }
+  if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Checking name…';
+  errEl.textContent = '';
+
+  try {
+    // Check if player name is already claimed in Firestore
+    // We need a temp db connection for this check
+    const { initializeApp: _ia, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const { getFirestore, getDoc, setDoc, doc }
+      = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+    const _apps = getApps();
+    const _app  = _apps.length ? _apps[0] : _ia(window._hardcodedCfg);
+    const _db   = getFirestore(_app);
+
+    // Check the playerClaims list by the same lowercase key it's stored
+    // under, so "Bando" and "bando" are treated as the same claimed name
+    // (a case-sensitive check here could let a second signup silently
+    // overwrite the first claim's record).
+    const claimKey  = name.toLowerCase();
+    const claimRef  = doc(_db, 'playerClaims', claimKey);
+    const claimSnap = await getDoc(claimRef);
+
+    if (claimSnap.exists()) {
+      errEl.textContent = 'That player name is already taken. Contact an admin if this is your name.';
+      btn.disabled = false; btn.textContent = 'Create Account';
+      return;
+    }
+
+    btn.textContent = 'Creating account…';
+
+    // Create Firebase Auth account
+    const cred = await window._signUp(window._preAuth, email, pass);
+    await window._updateProfile(cred.user, { displayName: name });
+
+    // Claim the player name
+    await setDoc(claimRef, {
+      playerName: name,
+      email: email,
+      uid: cred.user.uid,
+      claimedAt: Date.now()
+    });
+
+    window.currentPlayer = name;
+    // onAuthStateChanged fires and shows the app
+
+  } catch(e) {
+    errEl.textContent = e.code === 'auth/email-already-in-use'
+      ? 'That email is already registered. Try signing in.'
+      : e.code === 'auth/weak-password' ? 'Password is too weak.'
+      : 'Error: ' + e.message;
+    btn.disabled = false; btn.textContent = 'Create Account';
+  }
+};
+
+window.doLogout = async () => {
+  if (window._preAuth) await window._signOut(window._preAuth);
+  window.currentPlayer = '';
+};
 
 </script>
 
