@@ -643,19 +643,6 @@
   .invest-name { font-size:12px; font-weight:700; color:var(--text); text-align:center; margin-bottom:10px; letter-spacing:0.2px; }
 
   .invest-fields { width:100%; display:flex; flex-direction:column; gap:6px; }
-  .invest-name-row { width:100%; display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:2px; }
-  .invest-name-row .invest-name { margin-bottom:0; flex:1; min-width:0; }
-  .invest-max-btn {
-    flex-shrink:0;
-    background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.35);
-    color:#a78bfa; border-radius:6px; padding:3px 7px;
-    font-size:10px; font-weight:700; letter-spacing:0.5px;
-    cursor:pointer; font-family:'Inter',sans-serif;
-    transition: background 0.15s, color 0.15s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .invest-max-btn:hover { background:rgba(124,58,237,0.35); color:#fff; }
-  .invest-max-btn.done { background:rgba(34,197,94,0.15); border-color:rgba(34,197,94,0.4); color:#4ade80; }
   .invest-field-group { background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:6px 8px; }
   .invest-field-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-3); margin-bottom:4px; }
   .invest-field-value { display:flex; gap:4px; align-items:center; }
@@ -3423,7 +3410,6 @@ const CDN = 'https://www.sfetheria.com/images/characters/';
 let investData   = {};   // player -> { docId, units:{slug->{dupes,lattice,awakened}} }
 let investPlayer = '';
 let investInited = false;
-let _investLocalSave = false;
 
 window.initInvest = () => {
   if (!window.fsDb || !window.__fsFns) { setTimeout(window.initInvest, 200); return; }
@@ -3441,7 +3427,7 @@ window.initInvest = () => {
       investData[data.player] = { docId: d.id, units: data.units || {} };
     });
     populateInvestPlayers();
-    if (!_investLocalSave) renderInvest();
+    renderInvest();
   });
 };
 
@@ -3568,10 +3554,7 @@ window.renderInvest = () => {
         <div id="iinit-${slug}" class="invest-initial" style="display:none">${esc2(name[0])}</div>
         ${awakened ? '<div class="invest-awake-badge">⭐</div>' : ''}
       </div>
-      <div class="invest-name-row">
-        <div class="invest-name">${esc2(name)}</div>
-        <button class="invest-max-btn" onclick="maxInvestUnit('${slug}',this)" title="Max unit">MAX</button>
-      </div>
+      <div class="invest-name">${esc2(name)}</div>
       <div class="invest-fields">
         <div class="invest-field-group">
           <div class="invest-field-label">Dupes</div>
@@ -3634,23 +3617,9 @@ window.toggleInvest = (slug, field, val, btn) => {
   }
 };
 
-window.maxInvestUnit = async (slug, btn) => {
-  if (!investPlayer) return;
-  await saveInvestField(slug, 'dupes', 5);
-  await saveInvestField(slug, 'lat1', 5);
-  await saveInvestField(slug, 'lat2', 5);
-  await saveInvestField(slug, 'lat3', 5);
-  const card = document.getElementById('icard-' + slug);
-  if (card) card.querySelectorAll('.invest-num').forEach(inp => { inp.value = 5; });
-  btn.textContent = '✓';
-  btn.classList.add('done');
-  setTimeout(() => { btn.textContent = 'MAX'; btn.classList.remove('done'); }, 1500);
-};
-
 window.saveInvestField = async (slug, field, value) => {
   if (!investPlayer || !window.fsDb || !window.__fsFns) return;
   const { collection, doc, setDoc, getDocs, query, where, addDoc } = window.__fsFns;
-  _investLocalSave = true;
 
   if (!investData[investPlayer]) investData[investPlayer] = { units: {} };
   if (!investData[investPlayer].units[slug]) investData[investPlayer].units[slug] = {};
@@ -3684,7 +3653,6 @@ window.saveInvestField = async (slug, field, value) => {
       }
     }
   } catch(e) { console.error('saveInvestField:', e); }
-  finally { setTimeout(() => { _investLocalSave = false; }, 1000); }
 };
 </script>
 
