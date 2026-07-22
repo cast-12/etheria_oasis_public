@@ -737,12 +737,6 @@
   </div>
 
   <nav class="nav-tabs" aria-label="Main navigation">
-    <button class="tab-btn" id="tab-lookup" onclick="showSection('lookup')" style="display:none">Counter Lookup</button>
-    <button class="tab-btn" id="tab-data" onclick="showSection('data')" style="display:none">Manage Data</button>
-    <button class="tab-btn" id="tab-stats" onclick="showSection('stats')" style="display:none">Player Stats</button>
-    <button class="tab-btn" id="tab-roster" onclick="showSection('roster')" style="display:none">Roster</button>
-    <button class="tab-btn" id="tab-planner" onclick="showSection('planner')" style="display:none">War Planner</button>
-    <button class="tab-btn" id="tab-notes" onclick="showSection('notes')" style="display:none">Player Notes</button>
     <button class="tab-btn active" id="tab-invest" onclick="showSection('invest')">Unit Investment</button>
   </nav>
 
@@ -1230,12 +1224,7 @@ window.saveConfig = async () => {
 };
 
 // ── Section nav ─────────────────────────────────────────
-// Only 'invest' is a real, reachable section. Everything else is disabled
-// at the function level, so calling showSection('lookup') (or any other
-// name) from the console does nothing — there's no path that displays it.
-const ONLY_ALLOWED_SECTION = 'invest';
 window.showSection = name => {
-  if (name !== ONLY_ALLOWED_SECTION) return;
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.mobile-tab-btn').forEach(b => b.classList.remove('active'));
@@ -3371,27 +3360,6 @@ window._savePlayerNote = async (player, note, tier) => {
 };
 </script>
 <script>document.addEventListener("DOMContentLoaded", () => { if(window.initInvest) initInvest(); else setTimeout(()=>window.initInvest&&initInvest(),1000); });</script>
-<script>
-// ── Lock down every tab except Unit Investment ──────────────────────
-// Removes the disabled tabs' buttons and their section content from the
-// page entirely (not just hidden with CSS), so there is nothing for a
-// console command to reveal — the markup simply isn't there anymore.
-(() => {
-  const disabled = ['lookup', 'data', 'stats', 'roster', 'planner', 'notes'];
-  const removeNow = () => {
-    disabled.forEach(name => {
-      document.getElementById('section-' + name)?.remove();
-      document.getElementById('tab-' + name)?.remove();
-      document.getElementById('mob-tab-' + name)?.remove();
-    });
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', removeNow);
-  } else {
-    removeNow();
-  }
-})();
-</script>
 </body>
 </html>
 
