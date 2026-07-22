@@ -1230,17 +1230,26 @@ window.saveConfig = async () => {
 };
 
 // ── Section nav ─────────────────────────────────────────
+// Only 'invest' is a real, reachable section. Everything else is disabled
+// at the function level, so calling showSection('lookup') (or any other
+// name) from the console does nothing — there's no path that displays it.
+const ONLY_ALLOWED_SECTION = 'invest';
 window.showSection = name => {
-  if (name !== 'invest') return;
+  if (name !== ONLY_ALLOWED_SECTION) return;
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.mobile-tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('section-invest').classList.add('active');
-  const desktopTab = document.getElementById('tab-invest');
+  document.getElementById('section-' + name).classList.add('active');
+  const desktopTab = document.getElementById('tab-' + name);
   if (desktopTab) desktopTab.classList.add('active');
-  const mobileTab = document.getElementById('mob-tab-invest');
+  const mobileTab = document.getElementById('mob-tab-' + name);
   if (mobileTab) mobileTab.classList.add('active');
-  if (window.initInvest) initInvest();
+  if (name === 'data') renderList();
+  if (name === 'stats' && window.renderStats) renderStats();
+  if (name === 'roster' && window.renderRoster) renderRoster();
+  if (name === 'planner' && window.initPlanner) initPlanner();
+  if (name === 'notes' && window.initNotes) initNotes();
+  if (name === 'invest' && window.initInvest) initInvest();
 };
 
 // ── Lookup ──────────────────────────────────────────────
@@ -3201,7 +3210,11 @@ function scalePlannerForMobile() {
 }
 
 window.addEventListener('resize', scalePlannerForMobile);
-
+const _origShowSectionPlanner = window.showSection;
+window.showSection = name => {
+  _origShowSectionPlanner(name);
+  if (name === 'planner') setTimeout(scalePlannerForMobile, 100);
+};
 </script>
 </div><!-- /app-root -->
 <script>document.addEventListener("DOMContentLoaded", () => { if(window.initInvest) initInvest(); else setTimeout(()=>window.initInvest&&initInvest(),1000); });</script>
@@ -3358,6 +3371,27 @@ window._savePlayerNote = async (player, note, tier) => {
 };
 </script>
 <script>document.addEventListener("DOMContentLoaded", () => { if(window.initInvest) initInvest(); else setTimeout(()=>window.initInvest&&initInvest(),1000); });</script>
+<script>
+// ── Lock down every tab except Unit Investment ──────────────────────
+// Removes the disabled tabs' buttons and their section content from the
+// page entirely (not just hidden with CSS), so there is nothing for a
+// console command to reveal — the markup simply isn't there anymore.
+(() => {
+  const disabled = ['lookup', 'data', 'stats', 'roster', 'planner', 'notes'];
+  const removeNow = () => {
+    disabled.forEach(name => {
+      document.getElementById('section-' + name)?.remove();
+      document.getElementById('tab-' + name)?.remove();
+      document.getElementById('mob-tab-' + name)?.remove();
+    });
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', removeNow);
+  } else {
+    removeNow();
+  }
+})();
+</script>
 </body>
 </html>
 
