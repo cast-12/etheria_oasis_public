@@ -1231,20 +1231,16 @@ window.saveConfig = async () => {
 
 // ── Section nav ─────────────────────────────────────────
 window.showSection = name => {
+  if (name !== 'invest') return;
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.mobile-tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('section-' + name).classList.add('active');
-  const desktopTab = document.getElementById('tab-' + name);
+  document.getElementById('section-invest').classList.add('active');
+  const desktopTab = document.getElementById('tab-invest');
   if (desktopTab) desktopTab.classList.add('active');
-  const mobileTab = document.getElementById('mob-tab-' + name);
+  const mobileTab = document.getElementById('mob-tab-invest');
   if (mobileTab) mobileTab.classList.add('active');
-  if (name === 'data') renderList();
-  if (name === 'stats' && window.renderStats) renderStats();
-  if (name === 'roster' && window.renderRoster) renderRoster();
-  if (name === 'planner' && window.initPlanner) initPlanner();
-  if (name === 'notes' && window.initNotes) initNotes();
-  if (name === 'invest' && window.initInvest) initInvest();
+  if (window.initInvest) initInvest();
 };
 
 // ── Lookup ──────────────────────────────────────────────
@@ -3205,11 +3201,7 @@ function scalePlannerForMobile() {
 }
 
 window.addEventListener('resize', scalePlannerForMobile);
-const _origShowSectionPlanner = window.showSection;
-window.showSection = name => {
-  _origShowSectionPlanner(name);
-  if (name === 'planner') setTimeout(scalePlannerForMobile, 100);
-};
+
 </script>
 </div><!-- /app-root -->
 <script>document.addEventListener("DOMContentLoaded", () => { if(window.initInvest) initInvest(); else setTimeout(()=>window.initInvest&&initInvest(),1000); });</script>
