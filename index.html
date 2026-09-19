@@ -1278,7 +1278,8 @@ window.doLogout = async () => {
 
 // Full unit list: display name -> slug (hardcoded so no dependency on module scope)
 // Units with awakened toggle (shown first)
-const AWAKENED_SLUGS = new Set(['sania-vengeful-thorn','turandot','rc77','valerian','dinah','cachi']);
+const BASE_AWAKENED_SLUGS = ['sania-vengeful-thorn','turandot','rc77','valerian','dinah','cachi'];
+const AWAKENED_SLUGS = new Set(BASE_AWAKENED_SLUGS);
 
 const INVEST_UNITS = [
   // ── Awakened-eligible (top) ──
@@ -1305,6 +1306,35 @@ const INVEST_UNITS = [
   ['Xuan Li','xuan-li'],['Yeli','yeli']
 ];
 const CDN = 'https://www.sfetheria.com/images/characters/';
+
+// Slugs added through "Add Unit", mapped to when they were added. Lets the
+// grid place newly added units directly after the awakened block instead of
+// dropping them at the bottom of the roster.
+const CUSTOM_UNIT_ORDER = new Map();   // slug -> added timestamp
+
+// Display groups, in order:
+//   0  awakened-eligible units (built-in and custom alike)
+//   1  units added via "Add Unit" that have no awakening toggle
+//   2  the rest of the roster
+function investSortRank(slug) {
+  if (AWAKENED_SLUGS.has(slug))     return 0;
+  if (CUSTOM_UNIT_ORDER.has(slug))  return 1;
+  return 2;
+}
+
+// Sorts by group while preserving each group's existing order: built-in
+// awakened units keep their hand-picked sequence, custom units follow in the
+// order they were added, and everyone else stays alphabetical.
+function orderInvestUnits(list) {
+  return list
+    .map((unit, i) => ({ unit, i }))
+    .sort((a, b) => {
+      const ra = investSortRank(a.unit[1]);
+      const rb = investSortRank(b.unit[1]);
+      return ra !== rb ? ra - rb : a.i - b.i;
+    })
+    .map(e => e.unit);
+}
 
 let investData   = {};   // player -> { docId, units:{slug->{dupes,lattice,awakened}} }
 let investPlayer = '';
@@ -1436,7 +1466,7 @@ window.renderInvest = () => {
   if (ddWrap) ddWrap.style.display = (window.currentPlayer) ? 'none' : '';
 
   const search = (document.getElementById('invest-search')?.value||'').toLowerCase().trim();
-  let units = INVEST_UNITS;
+  let units = orderInvestUnits(INVEST_UNITS);
   if (search) units = units.filter(([name]) => name.toLowerCase().includes(search));
 
   const playerUnits = investData[investPlayer]?.units || {};
@@ -1684,13 +1714,23 @@ window.loadCustomUnits = () => {
   const { collection, onSnapshot } = window.__fsFns;
   onSnapshot(collection(window.fsDb, 'customUnits'), snap => {
     // Remove previously added custom units
-    const baseCount = window._baseInvestCount || 0;
     if (!window._baseInvestCount) window._baseInvestCount = INVEST_UNITS.length;
     INVEST_UNITS.splice(window._baseInvestCount);
 
-    snap.docs.forEach(d => {
-      const data = d.data();
+    // Rebuilt from scratch each time so a deleted or edited custom unit does
+    // not leave a stale entry behind in either collection.
+    AWAKENED_SLUGS.clear();
+    BASE_AWAKENED_SLUGS.forEach(slug => AWAKENED_SLUGS.add(slug));
+    CUSTOM_UNIT_ORDER.clear();
+
+    // Oldest first, so the newest addition lands at the end of its group.
+    const customUnits = snap.docs
+      .map(d => d.data())
+      .sort((a, b) => (a.added || 0) - (b.added || 0));
+
+    customUnits.forEach(data => {
       INVEST_UNITS.push([data.name, data.slug]);
+      CUSTOM_UNIT_ORDER.set(data.slug, data.added || 0);
       if (data.imgData) EMBEDDED_PORTRAITS[data.slug] = data.imgData;
       if (data.canAwaken) AWAKENED_SLUGS.add(data.slug);
     });
