@@ -838,6 +838,12 @@
       </div>
       <input type="text" id="invest-search" placeholder="Search units…" oninput="renderInvest()" autocomplete="off" style="flex:1;min-width:140px;max-width:220px">
       <span id="invest-status" style="font-size:13px;color:var(--text-3)"></span>
+      <label id="invest-extra-wrap" style="display:none;align-items:center;gap:7px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);border-radius:8px;padding:5px 10px;white-space:nowrap">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#a78bfa">Extra Lattice</span>
+        <input type="number" id="invest-extra" min="0" step="1" placeholder="0"
+          onchange="saveInvestExtra(this.value)" onblur="saveInvestExtra(this.value)"
+          style="width:72px;background:rgba(255,255,255,0.07);border:none;border-bottom:1px solid rgba(255,255,255,0.15);border-radius:4px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;padding:3px 6px;text-align:center;outline:none">
+      </label>
       
     </div>
 
@@ -1358,7 +1364,8 @@ window.initInvest = () => {
       investData = {};
       snap.docs.forEach(d => {
         const data = d.data();
-        investData[data.player] = { docId: d.id, units: data.units || {} };
+        investData[data.player] = { docId: d.id, units: data.units || {},
+                                    extra: Number(data.extraLattice) || 0 };
       });
       populateInvestPlayers();
       if (!_investLocalSave) renderInvest();
@@ -1472,6 +1479,14 @@ window.renderInvest = () => {
   const playerUnits = investData[investPlayer]?.units || {};
   const filledCount = Object.values(playerUnits).filter(d => d && (d.dupes || d.lattice || d.awakened)).length;
   if (statusEl) statusEl.textContent = investPlayer + ' · ' + filledCount + ' units tracked';
+
+  const extraWrap = document.getElementById('invest-extra-wrap');
+  const extraEl   = document.getElementById('invest-extra');
+  if (extraWrap) extraWrap.style.display = investPlayer ? 'flex' : 'none';
+  if (extraEl && document.activeElement !== extraEl) {
+    const ex = (investData[investPlayer] && investData[investPlayer].extra) || 0;
+    extraEl.value = ex ? String(ex) : '';
+  }
   // Show player name prominently if it's their own data
   const playerTitle = document.getElementById('invest-player-title');
   if (playerTitle) playerTitle.textContent = investPlayer;
@@ -1574,6 +1589,62 @@ window.maxInvestUnit = async (slug, btn) => {
   setTimeout(() => { btn.textContent = 'MAX'; btn.classList.remove('done'); }, 1500);
 };
 
+// Ceilings for the numeric investment fields. Dupes and each lattice node
+// both top out at 5, which is what MAX writes.
+const INVEST_FIELD_CAP = { dupes: 5, lat1: 5, lat2: 5, lat3: 5 };
+
+function clampInvestNum(value, cap) {
+  if (value === '' || value == null) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(cap, Math.floor(n)));
+}
+
+// Write the clamped value back so the user sees 5, not the 9 they typed.
+function syncInvestInput(slug, field, parsed) {
+  const card = document.getElementById('icard-' + slug);
+  if (!card) return;
+  const order = { dupes: 0, lat1: 1, lat2: 2, lat3: 3 };
+  const idx = order[field];
+  if (idx == null) return;
+  const inputs = card.querySelectorAll('input.invest-num');
+  if (inputs[idx]) inputs[idx].value = parsed == null ? '' : String(parsed);
+}
+
+// ── Extra lattice: player-level, not tied to a unit, deliberately uncapped
+window.saveInvestExtra = async (value) => {
+  if (window.currentPlayer) investPlayer = window.currentPlayer;
+  if (!investPlayer || !window.fsDb || !window.__fsFns) return;
+  const n = value === '' || value == null ? 0 : Math.max(0, Math.floor(Number(value) || 0));
+
+  if (!investData[investPlayer]) investData[investPlayer] = { units: {}, extra: 0 };
+  if (investData[investPlayer].extra === n) return;
+  investData[investPlayer].extra = n;
+  _investLocalSave = true;
+
+  const el = document.getElementById('invest-extra');
+  if (el) el.value = n ? String(n) : '';
+
+  const { collection, doc, setDoc, getDocs, query, where, addDoc } = window.__fsFns;
+  const payload = { player: investPlayer, units: investData[investPlayer].units,
+                    extraLattice: n, updated: Date.now() };
+  try {
+    const existing = investData[investPlayer]?.docId;
+    if (existing) {
+      await setDoc(doc(window.fsDb, 'unitInvestment', existing), payload);
+    } else {
+      const snap = await getDocs(query(collection(window.fsDb,'unitInvestment'), where('player','==',investPlayer)));
+      if (!snap.empty) {
+        investData[investPlayer].docId = snap.docs[0].id;
+        await setDoc(snap.docs[0].ref, payload);
+      } else {
+        const ref = await addDoc(collection(window.fsDb,'unitInvestment'), payload);
+        investData[investPlayer].docId = ref.id;
+      }
+    }
+  } catch (e) { console.error('saveInvestExtra:', e); }
+};
+
 window.saveInvestField = async (slug, field, value) => {
   // Hard stop: a claimed account can only ever write to its own player name.
   if (window.currentPlayer) investPlayer = window.currentPlayer;
@@ -1584,10 +1655,14 @@ window.saveInvestField = async (slug, field, value) => {
   if (!investData[investPlayer]) investData[investPlayer] = { units: {} };
   if (!investData[investPlayer].units[slug]) investData[investPlayer].units[slug] = {};
 
-  const parsed = (field === 'dupes' || field === 'lat1' || field === 'lat2' || field === 'lat3')
-               ? (value === '' || value == null ? null : Number(value))
+  const parsed = INVEST_FIELD_CAP[field] != null
+               ? clampInvestNum(value, INVEST_FIELD_CAP[field])
                : field === 'awakened' ? Boolean(value)
                : (value || null);
+  if (INVEST_FIELD_CAP[field] != null && value !== '' && value != null
+      && Number(value) !== parsed) {
+    syncInvestInput(slug, field, parsed);
+  }
   investData[investPlayer].units[slug][field] = parsed;
 
   // Update card highlight
@@ -1597,7 +1672,8 @@ window.saveInvestField = async (slug, field, value) => {
   if (card) card.classList.toggle('has-data', !!hasAny);
 
   // Firestore save
-  const payload = { player: investPlayer, units: investData[investPlayer].units, updated: Date.now() };
+  const payload = { player: investPlayer, units: investData[investPlayer].units,
+                    extraLattice: investData[investPlayer].extra || 0, updated: Date.now() };
   try {
     const existing = investData[investPlayer]?.docId;
     if (existing) {
